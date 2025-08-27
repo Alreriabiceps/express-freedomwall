@@ -153,4 +153,76 @@ router.get("/:id/results", getPostsRateLimiter, async (req, res) => {
   }
 });
 
+// ===== ADMIN ROUTES =====
+
+// GET /api/v1/polls/admin - Admin endpoint to see all polls (including inactive)
+router.get("/admin", async (req, res) => {
+  try {
+    // Check admin key from headers
+    const adminKey = req.headers["admin-key"];
+    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const polls = await Poll.find({}).sort({ createdAt: -1 });
+    res.json(polls);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error fetching polls", error: error.message });
+  }
+});
+
+// PUT /api/v1/polls/:id/status - Admin update poll status
+router.put("/:id/status", async (req, res) => {
+  try {
+    const { isActive, adminNotes } = req.body;
+
+    // Check admin key from headers
+    const adminKey = req.headers["admin-key"];
+    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const poll = await Poll.findById(req.params.id);
+    if (!poll) {
+      return res.status(404).json({ message: "Poll not found" });
+    }
+
+    // Update poll status
+    if (isActive !== undefined) poll.isActive = isActive;
+    if (adminNotes !== undefined) poll.adminNotes = adminNotes;
+
+    await poll.save();
+    res.json(poll);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error updating poll", error: error.message });
+  }
+});
+
+// DELETE /api/v1/polls/:id - Admin delete poll
+router.delete("/:id", async (req, res) => {
+  try {
+    // Check admin key from headers
+    const adminKey = req.headers["admin-key"];
+    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const poll = await Poll.findByIdAndDelete(req.params.id);
+    if (!poll) {
+      return res.status(404).json({ message: "Poll not found" });
+    }
+
+    console.log(`Poll "${poll.question.substring(0, 50)}..." deleted by admin`);
+    res.json({ message: "Poll deleted successfully" });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error deleting poll", error: error.message });
+  }
+});
+
 export default router;
