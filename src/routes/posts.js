@@ -109,4 +109,77 @@ router.post("/:id/report", reportRateLimiter, async (req, res) => {
   }
 });
 
+// ===== ADMIN ROUTES =====
+
+// GET /api/v1/posts/admin - Admin endpoint to see all posts (including hidden)
+router.get("/admin", async (req, res) => {
+  try {
+    // Check admin key from headers
+    const adminKey = req.headers["admin-key"];
+    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const posts = await Post.find({}).sort({ createdAt: -1 });
+    res.json(posts);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error fetching posts", error: error.message });
+  }
+});
+
+// PUT /api/v1/posts/:id/status - Admin update post status
+router.put("/:id/status", async (req, res) => {
+  try {
+    const { isHidden, isFlagged, adminNotes } = req.body;
+    
+    // Check admin key from headers
+    const adminKey = req.headers["admin-key"];
+    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    // Update post status
+    if (isHidden !== undefined) post.isHidden = isHidden;
+    if (isFlagged !== undefined) post.isFlagged = isFlagged;
+    if (adminNotes !== undefined) post.adminNotes = adminNotes;
+
+    await post.save();
+    res.json(post);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error updating post", error: error.message });
+  }
+});
+
+// DELETE /api/v1/posts/:id - Admin delete post
+router.delete("/:id", async (req, res) => {
+  try {
+    // Check admin key from headers
+    const adminKey = req.headers["admin-key"];
+    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const post = await Post.findByIdAndDelete(req.params.id);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    console.log(`Post "${post.message.substring(0, 50)}..." deleted by admin`);
+    res.json({ message: "Post deleted successfully" });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error deleting post", error: error.message });
+  }
+});
+
 export default router;
