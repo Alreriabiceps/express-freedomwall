@@ -36,6 +36,22 @@ const sanitizeText = (text) => {
   sanitized = sanitized.replace(/data:/gi, "");
   sanitized = sanitized.replace(/vbscript:/gi, "");
 
+  // Enhanced censoring for "jeren" and variations
+  const jerenPatterns = [
+    /j[3e]r[3e]n/gi, // j3ren, jeren, j3r3n, jer3n
+    /j[3e]r[3e]+n/gi, // jereeeeeen, j3r3e3n
+    /j[3e]+r[3e]+n/gi, // jeeeeeren, j333r3n
+    /j[3e]r[3e]*n/gi, // j3ren, jeren, j3r3n
+    /j[3e]*r[3e]*n/gi, // j3ren, jeren, j3r3n
+    /j[3e]r[3e]n+/gi, // jeren, j3r3n
+    /j[3e]+r[3e]+n+/gi, // jeeeeeren, j333r3n
+  ];
+
+  // Apply all patterns
+  jerenPatterns.forEach((pattern) => {
+    sanitized = sanitized.replace(pattern, "*****");
+  });
+
   // Escape HTML entities
   sanitized = escapeHtml(sanitized);
 
@@ -57,20 +73,99 @@ export const sanitizeBody = (req, res, next) => {
       req.body.name = "Anonymous";
     }
 
-    // Sanitize text content
-    if (req.body.message) {
-      req.body.message = escapeHtml(req.body.message);
-    }
+    // Enhanced censoring for "jeren" and variations in names
     if (req.body.name) {
+      const jerenPatterns = [
+        /j[3e]r[3e]n/gi, // j3ren, jeren, j3r3n, jer3n
+        /j[3e]r[3e]+n/gi, // jereeeeeen, j3r3e3n
+        /j[3e]+r[3e]+n/gi, // jeeeeeren, j333r3n
+        /j[3e]r[3e]*n/gi, // j3ren, jeren, j3r3n
+        /j[3e]*r[3e]*n/gi, // j3ren, jeren, j3r3n
+        /j[3e]r[3e]n+/gi, // jeren, j3r3n
+        /j[3e]+r[3e]+n+/gi, // jeeeeeren, j333r3n
+      ];
+
+      // Apply all patterns
+      jerenPatterns.forEach((pattern) => {
+        req.body.name = req.body.name.replace(pattern, "*****");
+      });
+
       req.body.name = escapeHtml(req.body.name);
     }
 
-    // Sanitize string fields
+    // Enhanced censoring for "jeren" and variations in messages
+    if (req.body.message) {
+      const jerenPatterns = [
+        /j[3e]r[3e]n/gi, // j3ren, jeren, j3r3n, jer3n
+        /j[3e]r[3e]+n/gi, // jereeeeeen, j3r3e3n
+        /j[3e]+r[3e]+n/gi, // jeeeeeren, j333r3n
+        /j[3e]r[3e]*n/gi, // j3ren, jeren, j3r3n
+        /j[3e]*r[3e]*n/gi, // j3ren, jeren, j3r3n
+        /j[3e]r[3e]n+/gi, // jeren, j3r3n
+        /j[3e]+r[3e]+n+/gi, // jeeeeeren, j333r3n
+      ];
+
+      // Apply all patterns to message content
+      jerenPatterns.forEach((pattern) => {
+        req.body.message = req.body.message.replace(pattern, "*****");
+      });
+
+      req.body.message = escapeHtml(req.body.message);
+    }
+
+    // Sanitize string fields with enhanced censoring
     if (req.body.name && req.body.name.trim()) {
       req.body.name = escapeHtml(req.body.name.trim());
     }
     if (req.body.message && req.body.message.trim()) {
       req.body.message = escapeHtml(req.body.message.trim());
+    }
+
+    // Enhanced censoring for "jeren" and variations in subject field
+    if (req.body.subject) {
+      const jerenPatterns = [
+        /j[3e]r[3e]n/gi, // j3ren, jeren, j3r3n, jer3n
+        /j[3e]r[3e]+n/gi, // jereeeeeen, j3r3e3n
+        /j[3e]+r[3e]+n/gi, // jeeeeeren, j333r3n
+        /j[3e]r[3e]*n/gi, // j3ren, jeren, j3r3n
+        /j[3e]*r[3e]*n/gi, // j3ren, jeren, j3r3n
+        /j[3e]r[3e]n+/gi, // jeren, j3r3n
+        /j[3e]+r[3e]+n+/gi, // jeeeeeren, j333r3n
+      ];
+
+      // Apply all patterns to subject content
+      jerenPatterns.forEach((pattern) => {
+        req.body.subject = req.body.subject.replace(pattern, "*****");
+      });
+
+      req.body.subject = escapeHtml(req.body.subject);
+    }
+
+    // Sanitize comment fields with enhanced censoring
+    if (req.body.comments && Array.isArray(req.body.comments)) {
+      const jerenPatterns = [
+        /j[3e]r[3e]n/gi, // j3ren, jeren, j3r3n, jer3n
+        /j[3e]r[3e]+n/gi, // jereeeeeen, j3r3e3n
+        /j[3e]+r[3e]+n/gi, // jeeeeeren, j333r3n
+        /j[3e]r[3e]*n/gi, // j3ren, jeren, j3r3n
+        /j[3e]*r[3e]*n/gi, // j3ren, jeren, j3r3n
+        /j[3e]r[3e]n+/gi, // jeren, j3r3n
+        /j[3e]+r[3e]+n+/gi, // jeeeeeren, j333r3n
+      ];
+
+      req.body.comments = req.body.comments.map((comment) => {
+        let censoredName = comment.name;
+        // Apply all patterns
+        jerenPatterns.forEach((pattern) => {
+          censoredName = censoredName.replace(pattern, "*****");
+        });
+
+        return {
+          name: escapeHtml(censoredName),
+          message: escapeHtml(comment.message),
+          createdAt: comment.createdAt, // Keep original createdAt
+        };
+      });
     }
   }
 
@@ -164,12 +259,12 @@ export const validateCommentContent = (req, res, next) => {
 
 // Validate and sanitize contact form content
 export const validateContactContent = (req, res, next) => {
-  const { name, email, subject, message } = req.body;
+  const { name, subject, message } = req.body;
 
   // Check for required fields
-  if (!name || !email || !subject || !message) {
+  if (!name || !subject || !message) {
     return res.status(400).json({
-      message: "Name, email, subject, and message are required",
+      message: "Name, subject, and message are required",
     });
   }
 
@@ -178,12 +273,6 @@ export const validateContactContent = (req, res, next) => {
     return res
       .status(400)
       .json({ message: "Name must be 100 characters or less" });
-  }
-
-  if (email.length > 100) {
-    return res
-      .status(400)
-      .json({ message: "Email must be 100 characters or less" });
   }
 
   if (subject.length > 200) {
@@ -198,14 +287,8 @@ export const validateContactContent = (req, res, next) => {
       .json({ message: "Message must be 1000 characters or less" });
   }
 
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return res.status(400).json({ message: "Invalid email format" });
-  }
-
   // Check for empty content after sanitization
-  if (!name.trim() || !email.trim() || !subject.trim() || !message.trim()) {
+  if (!name.trim() || !subject.trim() || !message.trim()) {
     return res.status(400).json({ message: "All fields cannot be empty" });
   }
 

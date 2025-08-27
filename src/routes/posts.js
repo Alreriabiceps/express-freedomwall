@@ -15,15 +15,27 @@ import {
 
 const router = express.Router();
 
-// Get all posts (sorted by engagement score)
+// Get all posts (popular first, then recent)
 router.get("/", getPostsRateLimiter, async (req, res) => {
   try {
-    const posts = await Post.find({ isHidden: false }).sort({
-      engagementScore: -1,
-      createdAt: -1,
-    });
-    res.json(posts);
+    // Get popular posts first (engagement score >= 5)
+    const popularPosts = await Post.find({
+      isHidden: false,
+      engagementScore: { $gte: 5 },
+    }).sort({ engagementScore: -1, createdAt: -1 });
+
+    // Get recent posts (engagement score < 5)
+    const recentPosts = await Post.find({
+      isHidden: false,
+      engagementScore: { $lt: 5 },
+    }).sort({ createdAt: -1 });
+
+    // Combine: popular posts first, then recent posts
+    const sortedPosts = [...popularPosts, ...recentPosts];
+
+    res.json(sortedPosts);
   } catch (error) {
+    console.error("Error fetching posts:", error);
     res
       .status(500)
       .json({ message: "Error fetching posts", error: error.message });
@@ -133,7 +145,7 @@ router.get("/admin", async (req, res) => {
 router.put("/:id/status", async (req, res) => {
   try {
     const { isHidden, isFlagged, adminNotes } = req.body;
-    
+
     // Check admin key from headers
     const adminKey = req.headers["admin-key"];
     if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
