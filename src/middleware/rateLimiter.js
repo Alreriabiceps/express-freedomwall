@@ -72,7 +72,7 @@ export const commentRateLimiter = createRateLimiter(
 );
 
 export const likeRateLimiter = createRateLimiter(
-  30, // 30 likes
+  10, // 10 likes (reduced from 30)
   60 * 1000, // per minute
   (req) => `like:${req.body.userId || req.ip}`
 );

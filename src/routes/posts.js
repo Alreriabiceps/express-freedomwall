@@ -15,9 +15,14 @@ import {
 
 const router = express.Router();
 
-// Get all posts (popular first, then recent)
+// Get all posts (popular first, then recent) with pagination
 router.get("/", getPostsRateLimiter, async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const userId = req.query.userId || req.headers["user-id"];
+
     // Get popular posts first (engagement score >= 5)
     const popularPosts = await Post.find({
       isHidden: false,
@@ -31,9 +36,29 @@ router.get("/", getPostsRateLimiter, async (req, res) => {
     }).sort({ createdAt: -1 });
 
     // Combine: popular posts first, then recent posts
-    const sortedPosts = [...popularPosts, ...recentPosts];
+    const allPosts = [...popularPosts, ...recentPosts];
 
-    res.json(sortedPosts);
+    // Add user like status to posts if userId is provided
+    if (userId) {
+      allPosts.forEach((post) => {
+        post.userLiked = post.hasUserLiked(userId);
+      });
+    }
+
+    // Apply pagination
+    const paginatedPosts = allPosts.slice(skip, skip + limit);
+
+    // Check if there are more posts
+    const hasMore = allPosts.length > skip + limit;
+
+    // Always return the new paginated format
+    res.json({
+      posts: paginatedPosts,
+      currentPage: page,
+      totalPages: Math.ceil(allPosts.length / limit),
+      hasMore,
+      totalPosts: allPosts.length,
+    });
   } catch (error) {
     console.error("Error fetching posts:", error);
     res
@@ -85,7 +110,7 @@ router.post(
   }
 );
 
-// Like a post
+// Like/Unlike a post (toggle)
 router.post("/:id/like", likeRateLimiter, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -93,13 +118,29 @@ router.post("/:id/like", likeRateLimiter, async (req, res) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    post.likes += 1;
+    // Get user identifier from request body or headers
+    const userId = req.body.userId || req.headers["user-id"] || req.ip;
+
+    // Additional validation: ensure userId is not empty
+    if (!userId || userId.trim() === "") {
+      return res.status(400).json({ message: "Invalid user identifier" });
+    }
+
+    // Use the toggleLike method to handle like/unlike
+    const result = post.toggleLike(userId);
     await post.save();
-    res.json({ likes: post.likes, liked: true });
+
+    res.json({
+      likes: result.likes,
+      liked: result.liked,
+      message: result.liked
+        ? "Post liked successfully"
+        : "Post unliked successfully",
+    });
   } catch (error) {
     res
       .status(500)
-      .json({ message: "Error liking post", error: error.message });
+      .json({ message: "Error toggling like", error: error.message });
   }
 });
 
