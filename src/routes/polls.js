@@ -71,11 +71,16 @@ router.post("/", getPostsRateLimiter, sanitizeBody, async (req, res) => {
 // Vote on a poll
 router.post("/:id/vote", getPostsRateLimiter, async (req, res) => {
   try {
-    const { optionIndex, userId } = req.body;
+    const { optionIndices, userId } = req.body;
 
-    if (optionIndex === undefined || !userId) {
+    if (
+      !optionIndices ||
+      !Array.isArray(optionIndices) ||
+      optionIndices.length === 0 ||
+      !userId
+    ) {
       return res.status(400).json({
-        message: "Option index and user ID are required",
+        message: "Option indices array and user ID are required",
       });
     }
 
@@ -92,8 +97,11 @@ router.post("/:id/vote", getPostsRateLimiter, async (req, res) => {
       return res.status(400).json({ message: "Poll has expired" });
     }
 
-    if (optionIndex < 0 || optionIndex >= poll.options.length) {
-      return res.status(400).json({ message: "Invalid option index" });
+    // Validate all option indices
+    for (const index of optionIndices) {
+      if (index < 0 || index >= poll.options.length) {
+        return res.status(400).json({ message: "Invalid option index" });
+      }
     }
 
     // Check if user already voted
@@ -107,10 +115,12 @@ router.post("/:id/vote", getPostsRateLimiter, async (req, res) => {
         .json({ message: "You have already voted on this poll" });
     }
 
-    // Add vote
-    poll.options[optionIndex].votes += 1;
-    poll.options[optionIndex].voters.push(userId);
-    poll.totalVotes += 1;
+    // Add votes for all selected options
+    for (const index of optionIndices) {
+      poll.options[index].votes += 1;
+      poll.options[index].voters.push(userId);
+    }
+    poll.totalVotes += optionIndices.length;
 
     await poll.save();
     res.json(poll);
