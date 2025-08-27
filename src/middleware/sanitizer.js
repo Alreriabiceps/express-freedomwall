@@ -48,25 +48,29 @@ const sanitizeText = (text) => {
 // Sanitize request body
 export const sanitizeBody = (req, res, next) => {
   if (req.body) {
-    // Sanitize string fields
-    if (req.body.name && req.body.name.trim()) {
-      req.body.name = sanitizeText(req.body.name);
-    } else {
-      req.body.name = "Anonymous"; // Set empty name to "Anonymous" for anonymous posts
-    }
-    if (req.body.message) {
-      req.body.message = sanitizeText(req.body.message);
-    }
-    if (req.body.reason) {
-      req.body.reason = sanitizeText(req.body.reason);
+    // Set empty name to "Anonymous"
+    if (
+      req.body.name === "" ||
+      req.body.name === null ||
+      req.body.name === undefined
+    ) {
+      req.body.name = "Anonymous";
     }
 
-    // Sanitize comment fields
-    if (req.body.comments && Array.isArray(req.body.comments)) {
-      req.body.comments = req.body.comments.map((comment) => ({
-        name: sanitizeText(comment.name),
-        message: sanitizeText(comment.message),
-      }));
+    // Sanitize text content
+    if (req.body.message) {
+      req.body.message = escapeHtml(req.body.message);
+    }
+    if (req.body.name) {
+      req.body.name = escapeHtml(req.body.name);
+    }
+
+    // Sanitize string fields
+    if (req.body.name && req.body.name.trim()) {
+      req.body.name = escapeHtml(req.body.name.trim());
+    }
+    if (req.body.message && req.body.message.trim()) {
+      req.body.message = escapeHtml(req.body.message.trim());
     }
   }
 
@@ -108,83 +112,51 @@ export const sanitizeAll = (req, res, next) => {
   });
 };
 
-// Validate and sanitize post content
+// Validation for post content
 export const validatePostContent = (req, res, next) => {
-  const { name, message } = req.body;
+  const { message, name } = req.body;
 
-  // Check for required fields
-  if (!message) {
-    return res.status(400).json({ message: "Message is required" });
-  }
-
-  // Check length limits (name is optional)
-  if (name && name.length > 100) {
-    return res
-      .status(400)
-      .json({ message: "Name must be 100 characters or less" });
+  if (!message || message.trim().length === 0) {
+    return res.status(400).json({
+      message: "Message is required",
+    });
   }
 
   if (message.length > 1000) {
-    return res
-      .status(400)
-      .json({ message: "Message must be 1000 characters or less" });
+    return res.status(400).json({
+      message: "Message cannot exceed 1000 characters",
+    });
   }
 
-  // Check for empty content after sanitization (name is optional)
-  if (!message.trim()) {
-    return res.status(400).json({ message: "Message cannot be empty" });
-  }
-
-  // Check for suspicious patterns
-  const suspiciousPatterns = [
-    /<script/i,
-    /javascript:/i,
-    /on\w+\s*=/i,
-    /data:/i,
-    /vbscript:/i,
-    /<iframe/i,
-    /<object/i,
-    /<embed/i,
-  ];
-
-  for (const pattern of suspiciousPatterns) {
-    if ((name && pattern.test(name)) || pattern.test(message)) {
-      return res
-        .status(400)
-        .json({ message: "Content contains suspicious patterns" });
-    }
+  if (name && name.length > 100) {
+    return res.status(400).json({
+      message: "Name cannot exceed 100 characters",
+    });
   }
 
   next();
 };
 
-// Validate and sanitize comment content
+// Validation for comment content
 export const validateCommentContent = (req, res, next) => {
-  const { name, message } = req.body;
+  const { message, name } = req.body;
 
-  // Check for required fields
-  if (!name || !message) {
-    return res.status(400).json({ message: "Name and message are required" });
+  if (!message || message.trim().length === 0) {
+    return res.status(400).json({
+      message: "Comment message is required",
+    });
   }
 
-  // Check length limits
-  if (name.length > 100) {
-    return res
-      .status(400)
-      .json({ message: "Name must be 100 characters or less" });
+  if (message.length > 500) {
+    return res.status(400).json({
+      message: "Comment cannot exceed 500 characters",
+    });
   }
 
-  if (message.length > 200) {
-    return res
-      .status(400)
-      .json({ message: "Comment must be 200 characters or less" });
-  }
-
-  // Check for empty content after sanitization
-  if (!name.trim() || !message.trim()) {
-    return res
-      .status(400)
-      .json({ message: "Name and message cannot be empty" });
+  if (name && name.length > 100) {
+    return res.status(400).json({
+      message: "Name cannot exceed 100 characters",
+    });
   }
 
   next();

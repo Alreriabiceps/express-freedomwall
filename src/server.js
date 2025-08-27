@@ -4,6 +4,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import postsRouter from "./routes/posts.js";
 import contactRouter from "./routes/contact.js";
+import pollsRouter from "./routes/polls.js";
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ mongoose
 // API Routes
 app.use("/api/v1/posts", postsRouter);
 app.use("/api/v1/contact", contactRouter);
+app.use("/api/v1/polls", pollsRouter);
 
 // Health check
 app.get("/health", (req, res) => {

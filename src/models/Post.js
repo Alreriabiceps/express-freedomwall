@@ -2,109 +2,42 @@ import mongoose from "mongoose";
 
 const commentSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: false,
-      trim: true,
-      maxlength: 100,
-      default: "Anonymous",
-    },
-    message: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 200, // Updated to match checklist requirement
-    },
+    name: { type: String, required: false, default: "Anonymous" },
+    message: { type: String, required: true, maxlength: 500 },
+    createdAt: { type: Date, default: Date.now },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
-
-const reportSchema = new mongoose.Schema({
-  userId: {
-    type: String,
-    required: true,
-  },
-  reason: {
-    type: String,
-    required: true,
-    trim: true,
-    maxlength: 200,
-  },
-  reportedAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
 
 const postSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: false,
-      trim: true,
-      maxlength: 100,
-      default: "Anonymous",
-    },
-    message: {
-      type: String,
-      required: true,
-      trim: true,
-      maxlength: 1000, // Updated to match frontend requirement
-    },
-    likes: {
-      type: Number,
-      default: 0,
-    },
-    likedBy: [
-      {
-        type: String, // Store IP address or session ID to prevent duplicate likes
-        required: true,
-      },
-    ],
+    name: { type: String, required: false, default: "Anonymous" },
+    message: { type: String, required: true, maxlength: 1000 },
+    likes: { type: Number, default: 0 },
     comments: [commentSchema],
-    isFlagged: {
-      type: Boolean,
-      default: false,
-    },
-    isHidden: {
-      type: Boolean,
-      default: false,
-    },
-    reportCount: {
-      type: Number,
-      default: 0,
-    },
-    reports: [reportSchema], // Store detailed report information
-    reportedBy: [String], // Keep for backward compatibility
-    engagementScore: {
-      type: Number,
-      default: 0,
-    },
+    reportCount: { type: Number, default: 0 },
+    isHidden: { type: Boolean, default: false },
+    isFlagged: { type: Boolean, default: false },
+    engagementScore: { type: Number, default: 0 },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
-
-// Index for fast latest queries
-postSchema.index({ createdAt: -1 });
-postSchema.index({ isHidden: 1, createdAt: -1 });
-postSchema.index({ engagementScore: -1, createdAt: -1 });
 
 // Method to calculate engagement score
 postSchema.methods.calculateEngagementScore = function () {
-  // Likes count + (comments count * 2) to give more weight to comments
-  this.engagementScore = this.likes + this.comments.length * 2;
-  return this.engagementScore;
+  const likes = this.likes || 0;
+  const comments = this.comments ? this.comments.length : 0;
+  return likes + comments * 2;
 };
 
-// Pre-save middleware to update engagement score
+// Pre-save middleware to calculate engagement score
 postSchema.pre("save", function (next) {
-  this.calculateEngagementScore();
+  this.engagementScore = this.calculateEngagementScore();
   next();
 });
+
+// Index for efficient sorting by engagement and date
+postSchema.index({ engagementScore: -1, createdAt: -1 });
 
 const Post = mongoose.model("Post", postSchema);
 
