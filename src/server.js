@@ -11,7 +11,20 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+// CORS configuration for production
+const corsOptions = {
+  origin: [
+    "http://localhost:3000", // Development
+    "http://localhost:5173", // Vite dev server
+    "https://*.vercel.app", // Vercel preview deployments
+    "https://*.vercel.app", // Vercel production deployments
+    process.env.FRONTEND_URL, // Custom frontend URL from environment
+  ].filter(Boolean),
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Connect to MongoDB
