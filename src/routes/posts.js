@@ -15,10 +15,14 @@ import {
 
 const router = express.Router();
 
-// GET /api/v1/posts - List all posts (latest first, excluding hidden posts)
+// GET /api/v1/posts - List all posts (sorted by engagement, then by latest)
 router.get("/", getPostsRateLimiter, async (req, res) => {
   try {
-    const posts = await Post.find({ isHidden: false }).sort({ createdAt: -1 });
+    const posts = await Post.find({ isHidden: false }).sort({
+      // Sort by engagement score first (likes + comments * 2), then by latest
+      engagementScore: -1,
+      createdAt: -1,
+    });
     res.json(posts);
   } catch (error) {
     res

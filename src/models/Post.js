@@ -78,6 +78,10 @@ const postSchema = new mongoose.Schema(
     },
     reports: [reportSchema], // Store detailed report information
     reportedBy: [String], // Keep for backward compatibility
+    engagementScore: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
@@ -87,6 +91,20 @@ const postSchema = new mongoose.Schema(
 // Index for fast latest queries
 postSchema.index({ createdAt: -1 });
 postSchema.index({ isHidden: 1, createdAt: -1 });
+postSchema.index({ engagementScore: -1, createdAt: -1 });
+
+// Method to calculate engagement score
+postSchema.methods.calculateEngagementScore = function () {
+  // Likes count + (comments count * 2) to give more weight to comments
+  this.engagementScore = this.likes + this.comments.length * 2;
+  return this.engagementScore;
+};
+
+// Pre-save middleware to update engagement score
+postSchema.pre("save", function (next) {
+  this.calculateEngagementScore();
+  next();
+});
 
 const Post = mongoose.model("Post", postSchema);
 
