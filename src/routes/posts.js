@@ -15,6 +15,14 @@ import {
 
 const router = express.Router();
 
+// Test route to verify the API is working
+router.get("/test", (req, res) => {
+  res.json({
+    message: "Posts API is working",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Get all posts (popular first, then recent) with pagination
 router.get("/", getPostsRateLimiter, async (req, res) => {
   try {
@@ -41,7 +49,19 @@ router.get("/", getPostsRateLimiter, async (req, res) => {
     // Add user like status to posts if userId is provided
     if (userId) {
       allPosts.forEach((post) => {
-        post.userLiked = post.hasUserLiked(userId);
+        try {
+          // Ensure likedBy field exists for existing posts
+          if (!post.likedBy) {
+            post.likedBy = [];
+          }
+          post.userLiked = post.hasUserLiked(userId);
+        } catch (error) {
+          console.error(
+            `Error checking like status for post ${post._id}:`,
+            error
+          );
+          post.userLiked = false;
+        }
       });
     }
 
