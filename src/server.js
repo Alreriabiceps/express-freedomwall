@@ -16,7 +16,7 @@ const corsOptions = {
   origin: [
     "http://localhost:3000", // Development
     "http://localhost:5173", // Vite dev server
-    "https://vite-freedomwall.vercel.app", // Your specific Vercel domain
+    "https://isfreedomwall.vercel.app", // Your new Vercel domain
     "https://*.vercel.app", // Vercel preview deployments
     process.env.FRONTEND_URL, // Custom frontend URL from environment
   ].filter(Boolean),
