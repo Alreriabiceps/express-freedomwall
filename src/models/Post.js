@@ -4,9 +4,10 @@ const commentSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
       maxlength: 100,
+      default: "Anonymous",
     },
     message: {
       type: String,
@@ -41,15 +42,16 @@ const postSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: true,
+      required: false,
       trim: true,
       maxlength: 100,
+      default: "Anonymous",
     },
     message: {
       type: String,
       required: true,
       trim: true,
-      maxlength: 300, // Updated to match checklist requirement
+      maxlength: 1000, // Updated to match frontend requirement
     },
     likes: {
       type: Number,

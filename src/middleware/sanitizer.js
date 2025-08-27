@@ -9,7 +9,6 @@ const htmlEntities = {
   ">": "&gt;",
   '"': "&quot;",
   "'": "&#x27;",
-  "/": "&#x2F;",
   "`": "&#x60;",
   "=": "&#x3D;",
 };
@@ -17,7 +16,7 @@ const htmlEntities = {
 // Escape HTML entities
 const escapeHtml = (text) => {
   if (typeof text !== "string") return text;
-  return text.replace(/[&<>"'`=\/]/g, (char) => htmlEntities[char]);
+  return text.replace(/[&<>"'`=]/g, (char) => htmlEntities[char]);
 };
 
 // Sanitize text content
@@ -50,8 +49,10 @@ const sanitizeText = (text) => {
 export const sanitizeBody = (req, res, next) => {
   if (req.body) {
     // Sanitize string fields
-    if (req.body.name) {
+    if (req.body.name && req.body.name.trim()) {
       req.body.name = sanitizeText(req.body.name);
+    } else {
+      req.body.name = "Anonymous"; // Set empty name to "Anonymous" for anonymous posts
     }
     if (req.body.message) {
       req.body.message = sanitizeText(req.body.message);
@@ -112,28 +113,26 @@ export const validatePostContent = (req, res, next) => {
   const { name, message } = req.body;
 
   // Check for required fields
-  if (!name || !message) {
-    return res.status(400).json({ message: "Name and message are required" });
+  if (!message) {
+    return res.status(400).json({ message: "Message is required" });
   }
 
-  // Check length limits
-  if (name.length > 100) {
+  // Check length limits (name is optional)
+  if (name && name.length > 100) {
     return res
       .status(400)
       .json({ message: "Name must be 100 characters or less" });
   }
 
-  if (message.length > 300) {
+  if (message.length > 1000) {
     return res
       .status(400)
-      .json({ message: "Message must be 300 characters or less" });
+      .json({ message: "Message must be 1000 characters or less" });
   }
 
-  // Check for empty content after sanitization
-  if (!name.trim() || !message.trim()) {
-    return res
-      .status(400)
-      .json({ message: "Name and message cannot be empty" });
+  // Check for empty content after sanitization (name is optional)
+  if (!message.trim()) {
+    return res.status(400).json({ message: "Message cannot be empty" });
   }
 
   // Check for suspicious patterns
@@ -149,7 +148,7 @@ export const validatePostContent = (req, res, next) => {
   ];
 
   for (const pattern of suspiciousPatterns) {
-    if (pattern.test(name) || pattern.test(message)) {
+    if ((name && pattern.test(name)) || pattern.test(message)) {
       return res
         .status(400)
         .json({ message: "Content contains suspicious patterns" });

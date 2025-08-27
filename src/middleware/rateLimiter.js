@@ -60,31 +60,38 @@ export const createRateLimiter = (maxRequests, windowMs, identifier) => {
 
 // Rate limiters for different actions
 export const postRateLimiter = createRateLimiter(
-  1, // 1 post
+  5, // 5 posts
   60 * 1000, // per minute
   (req) => `post:${req.body.name || "anonymous"}:${req.ip}`
 );
 
 export const commentRateLimiter = createRateLimiter(
-  3, // 3 comments
+  10, // 10 comments
   60 * 1000, // per minute
   (req) => `comment:${req.body.name || "anonymous"}:${req.ip}`
 );
 
 export const likeRateLimiter = createRateLimiter(
-  10, // 10 likes
+  30, // 30 likes
   60 * 1000, // per minute
   (req) => `like:${req.body.userId || req.ip}`
 );
 
 export const reportRateLimiter = createRateLimiter(
-  5, // 5 reports
+  10, // 10 reports
   60 * 1000, // per minute
   (req) => `report:${req.body.userId || req.ip}`
 );
 
 export const contactRateLimiter = createRateLimiter(
-  2, // 2 contact messages
+  5, // 5 contact messages
   60 * 60 * 1000, // per hour
   (req) => `contact:${req.body.email || req.ip}`
+);
+
+// Rate limiter for GET requests (reading posts)
+export const getPostsRateLimiter = createRateLimiter(
+  100, // 100 requests
+  60 * 1000, // per minute
+  (req) => `get:${req.ip}`
 );

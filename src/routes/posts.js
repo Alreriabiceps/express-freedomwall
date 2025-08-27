@@ -5,6 +5,7 @@ import {
   commentRateLimiter,
   likeRateLimiter,
   reportRateLimiter,
+  getPostsRateLimiter,
 } from "../middleware/rateLimiter.js";
 import {
   sanitizeAll,
@@ -15,7 +16,7 @@ import {
 const router = express.Router();
 
 // GET /api/v1/posts - List all posts (latest first, excluding hidden posts)
-router.get("/", async (req, res) => {
+router.get("/", getPostsRateLimiter, async (req, res) => {
   try {
     const posts = await Post.find({ isHidden: false }).sort({ createdAt: -1 });
     res.json(posts);
