@@ -1,19 +1,19 @@
 import express from "express";
 import Contact from "../models/Contact.js";
 import { contactRateLimiter } from "../middleware/rateLimiter.js";
-import {
-  sanitizeAll,
-  validateContactContent,
-} from "../middleware/sanitizer.js";
+// import {
+//   sanitizeAll,
+//   validateContactContent,
+// } from "../middleware/sanitizer.js";
 
 const router = express.Router();
 
 // POST /api/v1/contact - Submit contact form
 router.post(
   "/",
-  sanitizeAll,
+  // sanitizeAll,
   contactRateLimiter,
-  validateContactContent,
+  // validateContactContent,
   async (req, res) => {
     try {
       const { name, email, phone, subject, message } = req.body;

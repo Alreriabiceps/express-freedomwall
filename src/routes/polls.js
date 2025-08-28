@@ -1,7 +1,7 @@
 import express from "express";
 import Poll from "../models/Poll.js";
 import { getPostsRateLimiter } from "../middleware/rateLimiter.js";
-import { sanitizeBody } from "../middleware/sanitizer.js";
+// import { sanitizeBody } from "../middleware/sanitizer.js";
 
 const router = express.Router();
 
@@ -35,38 +35,42 @@ router.get("/trending", getPostsRateLimiter, async (req, res) => {
 });
 
 // Create a new poll
-router.post("/", getPostsRateLimiter, sanitizeBody, async (req, res) => {
-  try {
-    const { question, options, expiresAt, topics } = req.body;
+router.post(
+  "/",
+  getPostsRateLimiter,
+  /* sanitizeBody, */ async (req, res) => {
+    try {
+      const { question, options, expiresAt, topics } = req.body;
 
-    if (!question || !options || options.length < 2) {
-      return res.status(400).json({
-        message: "Question and at least 2 options are required",
+      if (!question || !options || options.length < 2) {
+        return res.status(400).json({
+          message: "Question and at least 2 options are required",
+        });
+      }
+
+      if (options.length > 6) {
+        return res.status(400).json({
+          message: "Maximum 6 options allowed",
+        });
+      }
+
+      const poll = new Poll({
+        question,
+        options: options.map((option) => ({ text: option })),
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        topics: topics || [],
+        createdBy: req.body.name || "Anonymous",
       });
+
+      await poll.save();
+      res.status(201).json(poll);
+    } catch (error) {
+      res
+        .status(500)
+        .json({ message: "Error creating poll", error: error.message });
     }
-
-    if (options.length > 6) {
-      return res.status(400).json({
-        message: "Maximum 6 options allowed",
-      });
-    }
-
-    const poll = new Poll({
-      question,
-      options: options.map((option) => ({ text: option })),
-      expiresAt: expiresAt ? new Date(expiresAt) : null,
-      topics: topics || [],
-      createdBy: req.body.name || "Anonymous",
-    });
-
-    await poll.save();
-    res.status(201).json(poll);
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error creating poll", error: error.message });
   }
-});
+);
 
 // Vote on a poll
 router.post("/:id/vote", getPostsRateLimiter, async (req, res) => {

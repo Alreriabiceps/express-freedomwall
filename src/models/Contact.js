@@ -6,19 +6,16 @@ const contactSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      maxlength: 100,
     },
     subject: {
       type: String,
       required: true,
       trim: true,
-      maxlength: 200,
     },
     message: {
       type: String,
       required: true,
       trim: true,
-      maxlength: 1000,
     },
     isRead: {
       type: Boolean,
@@ -32,7 +29,6 @@ const contactSchema = new mongoose.Schema(
     adminNotes: {
       type: String,
       trim: true,
-      maxlength: 500,
     },
   },
   {

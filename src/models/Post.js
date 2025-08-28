@@ -3,15 +3,21 @@ import mongoose from "mongoose";
 const commentSchema = new mongoose.Schema(
   {
     name: { type: String, required: false, default: "Anonymous" },
-    message: { type: String, required: true, maxlength: 500 },
+    message: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
     thumbsUp: { type: Number, default: 0 },
     thumbsDown: { type: Number, default: 0 },
-    userReactions: [{
-      userId: { type: String, required: true },
-      reaction: { type: String, enum: ['thumbsUp', 'thumbsDown'], required: true },
-      createdAt: { type: Date, default: Date.now }
-    }]
+    userReactions: [
+      {
+        userId: { type: String, required: true },
+        reaction: {
+          type: String,
+          enum: ["thumbsUp", "thumbsDown"],
+          required: true,
+        },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   { timestamps: true }
 );
@@ -28,14 +34,19 @@ commentSchema.methods.handleReaction = function (userId, reaction) {
     }
 
     // Find existing user reaction
-    const existingReactionIndex = this.userReactions.findIndex(r => r.userId === userId);
-    const existingReaction = existingReactionIndex !== -1 ? this.userReactions[existingReactionIndex] : null;
+    const existingReactionIndex = this.userReactions.findIndex(
+      (r) => r.userId === userId
+    );
+    const existingReaction =
+      existingReactionIndex !== -1
+        ? this.userReactions[existingReactionIndex]
+        : null;
 
     if (existingReaction) {
       if (existingReaction.reaction === reaction) {
         // User is removing their reaction
         this.userReactions.splice(existingReactionIndex, 1);
-        if (reaction === 'thumbsUp') {
+        if (reaction === "thumbsUp") {
           this.thumbsUp = Math.max(0, this.thumbsUp - 1);
         } else {
           this.thumbsDown = Math.max(0, this.thumbsDown - 1);
@@ -45,14 +56,14 @@ commentSchema.methods.handleReaction = function (userId, reaction) {
         // User is changing their reaction
         this.userReactions.splice(existingReactionIndex, 1);
         // Remove old reaction count
-        if (existingReaction.reaction === 'thumbsUp') {
+        if (existingReaction.reaction === "thumbsUp") {
           this.thumbsUp = Math.max(0, this.thumbsUp - 1);
         } else {
           this.thumbsDown = Math.max(0, this.thumbsDown - 1);
         }
         // Add new reaction
         this.userReactions.push({ userId, reaction });
-        if (reaction === 'thumbsUp') {
+        if (reaction === "thumbsUp") {
           this.thumbsUp += 1;
         } else {
           this.thumbsDown += 1;
@@ -62,7 +73,7 @@ commentSchema.methods.handleReaction = function (userId, reaction) {
     } else {
       // User is adding a new reaction
       this.userReactions.push({ userId, reaction });
-      if (reaction === 'thumbsUp') {
+      if (reaction === "thumbsUp") {
         this.thumbsUp += 1;
       } else {
         this.thumbsDown += 1;
@@ -81,15 +92,15 @@ commentSchema.methods.hasUserReacted = function (userId) {
     if (!userId || !this.userReactions) {
       return { thumbsUp: false, thumbsDown: false };
     }
-    
-    const userReaction = this.userReactions.find(r => r.userId === userId);
+
+    const userReaction = this.userReactions.find((r) => r.userId === userId);
     if (!userReaction) {
       return { thumbsUp: false, thumbsDown: false };
     }
-    
+
     return {
-      thumbsUp: userReaction.reaction === 'thumbsUp',
-      thumbsDown: userReaction.reaction === 'thumbsDown'
+      thumbsUp: userReaction.reaction === "thumbsUp",
+      thumbsDown: userReaction.reaction === "thumbsDown",
     };
   } catch (error) {
     console.error(`Error in hasUserReacted for comment:`, error);
@@ -100,7 +111,7 @@ commentSchema.methods.hasUserReacted = function (userId) {
 const postSchema = new mongoose.Schema(
   {
     name: { type: String, required: false, default: "Anonymous" },
-    message: { type: String, required: true, maxlength: 1000 },
+    message: { type: String, required: true },
     likes: { type: Number, default: 0 },
     likedBy: [{ type: String }], // Array of user identifiers who liked the post
     comments: [commentSchema],

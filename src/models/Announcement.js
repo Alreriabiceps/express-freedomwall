@@ -5,12 +5,10 @@ const announcementSchema = new mongoose.Schema(
     title: {
       type: String,
       required: true,
-      maxlength: 200,
     },
     message: {
       type: String,
       required: true,
-      maxlength: 1000,
     },
     type: {
       type: String,
@@ -37,7 +35,6 @@ const announcementSchema = new mongoose.Schema(
     },
     adminNotes: {
       type: String,
-      maxlength: 500,
     },
   },
   {
