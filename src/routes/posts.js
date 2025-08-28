@@ -193,6 +193,64 @@ router.post("/:id/report", reportRateLimiter, async (req, res) => {
   }
 });
 
+// ===== COMMENT REACTIONS =====
+
+// POST /api/v1/posts/:postId/comments/:commentIndex/react - React to a comment
+router.post("/:postId/comments/:commentIndex/react", commentRateLimiter, async (req, res) => {
+  try {
+    const { postId, commentIndex } = req.params;
+    const { reaction, userId } = req.body;
+
+    // Validate reaction type
+    if (!['thumbsUp', 'thumbsDown'].includes(reaction)) {
+      return res.status(400).json({ 
+        message: "Invalid reaction type. Must be 'thumbsUp' or 'thumbsDown'" 
+      });
+    }
+
+    if (!userId) {
+      return res.status(400).json({ message: "userId is required" });
+    }
+
+    // Find the post
+    const post = await Post.findById(postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    // Check if comment index is valid
+    if (commentIndex < 0 || commentIndex >= post.comments.length) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    const comment = post.comments[commentIndex];
+    
+    // Handle the reaction using the comment method
+    const result = comment.handleReaction(userId, reaction);
+    
+    // Save the post to persist changes
+    await post.save();
+    
+    // Return updated comment data
+    res.json({
+      message: "Reaction updated successfully",
+      result,
+      comment: {
+        thumbsUp: comment.thumbsUp,
+        thumbsDown: comment.thumbsDown,
+        userReactions: comment.userReactions
+      }
+    });
+
+  } catch (error) {
+    console.error("Error handling comment reaction:", error);
+    res.status(500).json({ 
+      message: "Error updating comment reaction", 
+      error: error.message 
+    });
+  }
+});
+
 // ===== ADMIN ROUTES =====
 
 // GET /api/v1/posts/admin - Admin endpoint to see all posts (including hidden)
