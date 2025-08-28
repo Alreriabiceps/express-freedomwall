@@ -76,21 +76,6 @@ router.post("/", async (req, res) => {
     });
 
     await announcement.save();
-
-    // Send real-time notification for new announcement
-    try {
-      const { NotificationService } = await import(
-        "../services/notificationService.js"
-      );
-      await NotificationService.notifyNewAnnouncement(announcement);
-    } catch (notificationError) {
-      console.error(
-        "Error sending announcement notification:",
-        notificationError
-      );
-      // Don't fail the announcement creation if notification fails
-    }
-
     res.status(201).json(announcement);
   } catch (error) {
     res.status(500).json({

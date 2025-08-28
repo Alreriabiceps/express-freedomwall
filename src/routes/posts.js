@@ -108,18 +108,6 @@ router.post(
     try {
       const post = new Post(req.body);
       await post.save();
-
-      // Send real-time notification for new post
-      try {
-        const { NotificationService } = await import(
-          "../services/notificationService.js"
-        );
-        await NotificationService.notifyNewPost(post);
-      } catch (notificationError) {
-        console.error("Error sending notification:", notificationError);
-        // Don't fail the post creation if notification fails
-      }
-
       res.status(201).json(post);
     } catch (error) {
       res
@@ -144,19 +132,6 @@ router.post(
 
       post.comments.push(req.body);
       await post.save();
-
-      // Send real-time notification for new comment
-      try {
-        const { NotificationService } = await import(
-          "../services/notificationService.js"
-        );
-        const newComment = post.comments[post.comments.length - 1];
-        await NotificationService.notifyNewComment(post, newComment);
-      } catch (notificationError) {
-        console.error("Error sending comment notification:", notificationError);
-        // Don't fail the comment creation if notification fails
-      }
-
       res.json(post);
     } catch (error) {
       res
@@ -186,19 +161,6 @@ router.post("/:id/like", likeRateLimiter, async (req, res) => {
     const result = post.toggleLike(userId);
     await post.save();
 
-    // Send real-time notification for post like
-    if (result.liked) {
-      try {
-        const { NotificationService } = await import(
-          "../services/notificationService.js"
-        );
-        await NotificationService.notifyPostLike(post, result.likes);
-      } catch (notificationError) {
-        console.error("Error sending like notification:", notificationError);
-        // Don't fail the like if notification fails
-      }
-    }
-
     res.json({
       likes: result.likes,
       liked: result.liked,
@@ -223,18 +185,6 @@ router.post("/:id/report", reportRateLimiter, async (req, res) => {
 
     post.reportCount += 1;
     await post.save();
-
-    // Send real-time notification for post report
-    try {
-      const { NotificationService } = await import(
-        "../services/notificationService.js"
-      );
-      await NotificationService.notifyPostReport(post, post.reportCount);
-    } catch (notificationError) {
-      console.error("Error sending report notification:", notificationError);
-      // Don't fail the report if notification fails
-    }
-
     res.json({ message: "Post reported successfully" });
   } catch (error) {
     res
@@ -283,29 +233,6 @@ router.post(
 
       // Save the post to persist changes
       await post.save();
-
-      // Send real-time notification for comment reaction
-      try {
-        const { NotificationService } = await import(
-          "../services/notificationService.js"
-        );
-        await NotificationService.sendSystemNotification(
-          "Comment Reaction",
-          `Someone reacted to a comment on a post`,
-          {
-            postId: postId,
-            commentIndex: commentIndex,
-            reaction: reaction,
-            postType: "commentReaction",
-          }
-        );
-      } catch (notificationError) {
-        console.error(
-          "Error sending comment reaction notification:",
-          notificationError
-        );
-        // Don't fail the reaction if notification fails
-      }
 
       // Return updated comment data
       res.json({
@@ -438,26 +365,6 @@ router.delete("/:id", async (req, res) => {
     res
       .status(500)
       .json({ message: "Error deleting post", error: error.message });
-  }
-});
-
-// Test notification endpoint
-router.post("/test-notification", async (req, res) => {
-  try {
-    const { NotificationService } = await import(
-      "../services/notificationService.js"
-    );
-    const userId = req.body.userId || "test-user";
-
-    await NotificationService.sendTestNotification(userId);
-
-    res.json({ message: "Test notification sent successfully" });
-  } catch (error) {
-    console.error("Error sending test notification:", error);
-    res.status(500).json({
-      message: "Error sending test notification",
-      error: error.message,
-    });
   }
 });
 
