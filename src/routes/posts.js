@@ -304,6 +304,47 @@ router.put("/:id/status", async (req, res) => {
   }
 });
 
+// DELETE /api/v1/posts/:id/comment/:commentIndex - Admin delete specific comment
+router.delete("/:id/comment/:commentIndex", async (req, res) => {
+  try {
+    // Check admin key from headers
+    const adminKey = req.headers["admin-key"];
+    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { id, commentIndex } = req.params;
+    const post = await Post.findById(id);
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    // Check if comment index is valid
+    if (commentIndex < 0 || commentIndex >= post.comments.length) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    // Get comment details for logging
+    const commentToDelete = post.comments[commentIndex];
+    const commentText = commentToDelete.message.substring(0, 50);
+
+    // Remove the comment
+    post.comments.splice(commentIndex, 1);
+    await post.save();
+
+    console.log(`Comment "${commentText}..." deleted by admin from post ${id}`);
+    res.json({
+      message: "Comment deleted successfully",
+      remainingComments: post.comments.length,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error deleting comment", error: error.message });
+  }
+});
+
 // DELETE /api/v1/posts/:id - Admin delete post
 router.delete("/:id", async (req, res) => {
   try {
