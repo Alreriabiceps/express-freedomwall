@@ -2,6 +2,8 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
+import { WebSocketServer } from "ws";
+import { createServer } from "http";
 import postsRouter from "./routes/posts.js";
 import contactRouter from "./routes/contact.js";
 import pollsRouter from "./routes/polls.js";
@@ -10,7 +12,76 @@ import announcementsRouter from "./routes/announcements.js";
 dotenv.config();
 
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 5000;
+
+// WebSocket Server
+const wss = new WebSocketServer({ server });
+
+// WebSocket connection handling
+wss.on("connection", (ws) => {
+  console.log("New WebSocket connection established");
+
+  // Send welcome message
+  ws.send(
+    JSON.stringify({
+      type: "connection",
+      message: "Connected to Freedom Wall WebSocket server",
+    })
+  );
+
+  // Handle incoming messages
+  ws.on("message", (data) => {
+    try {
+      const message = JSON.parse(data);
+      console.log("Received WebSocket message:", message);
+
+      // Handle different message types
+      switch (message.type) {
+        case "subscribe":
+          // User wants to subscribe to notifications
+          ws.userId = message.userId;
+          ws.notificationSettings = message.settings || {};
+          console.log(`User ${message.userId} subscribed to notifications`);
+          break;
+        case "ping":
+          // Respond to ping with pong
+          ws.send(JSON.stringify({ type: "pong", timestamp: Date.now() }));
+          break;
+        default:
+          console.log("Unknown message type:", message.type);
+      }
+    } catch (error) {
+      console.error("Error parsing WebSocket message:", error);
+    }
+  });
+
+  // Handle connection close
+  ws.on("close", () => {
+    console.log("WebSocket connection closed");
+  });
+
+  // Handle errors
+  ws.on("error", (error) => {
+    console.error("WebSocket error:", error);
+  });
+});
+
+// Function to broadcast notifications to all connected clients
+export const broadcastNotification = (notification) => {
+  wss.clients.forEach((client) => {
+    if (client.readyState === 1) {
+      // 1 = WebSocket.OPEN
+      // Check if user has enabled this type of notification
+      if (
+        client.notificationSettings &&
+        client.notificationSettings[notification.type] !== false
+      ) {
+        client.send(JSON.stringify(notification));
+      }
+    }
+  });
+};
 
 // Middleware
 // CORS configuration for production
@@ -52,6 +123,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Something went wrong!" });
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Freedom Wall API running on port ${PORT}`);
+  console.log(`WebSocket server ready on ws://localhost:${PORT}`);
 });

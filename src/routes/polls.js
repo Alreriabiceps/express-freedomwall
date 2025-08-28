@@ -63,6 +63,18 @@ router.post(
       });
 
       await poll.save();
+
+      // Send real-time notification for new poll
+      try {
+        const { NotificationService } = await import(
+          "../services/notificationService.js"
+        );
+        await NotificationService.notifyNewPoll(poll);
+      } catch (notificationError) {
+        console.error("Error sending poll notification:", notificationError);
+        // Don't fail the poll creation if notification fails
+      }
+
       res.status(201).json(poll);
     } catch (error) {
       res
@@ -127,6 +139,21 @@ router.post("/:id/vote", getPostsRateLimiter, async (req, res) => {
     poll.totalVotes += optionIndices.length;
 
     await poll.save();
+
+    // Send real-time notification for poll results update
+    try {
+      const { NotificationService } = await import(
+        "../services/notificationService.js"
+      );
+      await NotificationService.notifyPollResults(poll);
+    } catch (notificationError) {
+      console.error(
+        "Error sending poll results notification:",
+        notificationError
+      );
+      // Don't fail the voting if notification fails
+    }
+
     res.json(poll);
   } catch (error) {
     res
