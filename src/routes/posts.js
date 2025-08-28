@@ -23,28 +23,39 @@ router.get("/test", (req, res) => {
   });
 });
 
-// Get all posts (popular first, then recent) with pagination
+// Get all posts with sorting options and pagination
 router.get("/", getPostsRateLimiter, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     const userId = req.query.userId || req.headers["user-id"];
+    const sortBy = req.query.sort || "default"; // New: support for sort parameter
 
-    // Get popular posts first (engagement score >= 5)
-    const popularPosts = await Post.find({
-      isHidden: false,
-      engagementScore: { $gte: 5 },
-    }).sort({ engagementScore: -1, createdAt: -1 });
+    let allPosts;
 
-    // Get recent posts (engagement score < 5)
-    const recentPosts = await Post.find({
-      isHidden: false,
-      engagementScore: { $lt: 5 },
-    }).sort({ createdAt: -1 });
+    if (sortBy === "recent") {
+      // Sort purely by creation date (most recent first)
+      allPosts = await Post.find({
+        isHidden: false,
+      }).sort({ createdAt: -1 });
+    } else {
+      // Default sorting: popular first, then recent
+      // Get popular posts first (engagement score >= 5)
+      const popularPosts = await Post.find({
+        isHidden: false,
+        engagementScore: { $gte: 5 },
+      }).sort({ engagementScore: -1, createdAt: -1 });
 
-    // Combine: popular posts first, then recent posts
-    const allPosts = [...popularPosts, ...recentPosts];
+      // Get recent posts (engagement score < 5)
+      const recentPosts = await Post.find({
+        isHidden: false,
+        engagementScore: { $lt: 5 },
+      }).sort({ createdAt: -1 });
+
+      // Combine: popular posts first, then recent posts
+      allPosts = [...popularPosts, ...recentPosts];
+    }
 
     // Add user like status to posts if userId is provided
     if (userId) {
