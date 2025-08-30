@@ -1,5 +1,6 @@
 import express from "express";
 import Post from "../models/Post.js";
+import { getRealIP, sanitizeIP } from "../utils/ipUtils.js";
 import {
   postRateLimiter,
   commentRateLimiter,
@@ -106,9 +107,27 @@ router.post(
   // sanitizeBody,
   async (req, res) => {
     try {
-      const post = new Post(req.body);
+      // Get the real IP address
+      const realIP = getRealIP(req);
+      const sanitizedIP = sanitizeIP(realIP);
+
+      // Create post data with IP address
+      const postData = {
+        ...req.body,
+        ipAddress: sanitizedIP,
+      };
+
+      const post = new Post(postData);
       await post.save();
-      res.status(201).json(post);
+
+      // Log the IP address for moderation purposes
+      console.log(`New post created from IP: ${sanitizedIP}`);
+
+      // Don't send IP address in response for security
+      const postResponse = post.toObject();
+      delete postResponse.ipAddress;
+
+      res.status(201).json(postResponse);
     } catch (error) {
       res
         .status(500)
@@ -266,7 +285,17 @@ router.get("/admin", async (req, res) => {
     }
 
     const posts = await Post.find({}).sort({ createdAt: -1 });
-    res.json(posts);
+
+    // Include IP addresses for admin view
+    const postsWithIP = posts.map((post) => {
+      const postObj = post.toObject();
+      return {
+        ...postObj,
+        ipAddress: postObj.ipAddress || "unknown",
+      };
+    });
+
+    res.json(postsWithIP);
   } catch (error) {
     res
       .status(500)
@@ -296,7 +325,10 @@ router.put("/:id/status", async (req, res) => {
     if (adminNotes !== undefined) post.adminNotes = adminNotes;
 
     await post.save();
-    res.json(post);
+
+    // Return post with IP address for admin view
+    const postWithIP = post.toObject();
+    res.json(postWithIP);
   } catch (error) {
     res
       .status(500)
@@ -365,6 +397,91 @@ router.delete("/:id", async (req, res) => {
     res
       .status(500)
       .json({ message: "Error deleting post", error: error.message });
+  }
+});
+
+// GET /api/v1/posts/admin/ip/:ipAddress - Admin endpoint to find posts by IP address
+router.get("/admin/ip/:ipAddress", async (req, res) => {
+  try {
+    // Check admin key from headers
+    const adminKey = req.headers["admin-key"];
+    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { ipAddress } = req.params;
+
+    // Find all posts from this IP address
+    const posts = await Post.find({
+      ipAddress: { $regex: ipAddress, $options: "i" },
+    }).sort({ createdAt: -1 });
+
+    if (posts.length === 0) {
+      return res.json({
+        message: `No posts found from IP: ${ipAddress}`,
+        posts: [],
+        count: 0,
+      });
+    }
+
+    // Include IP addresses for admin view
+    const postsWithIP = posts.map((post) => {
+      const postObj = post.toObject();
+      return {
+        ...postObj,
+        ipAddress: postObj.ipAddress || "unknown",
+      };
+    });
+
+    res.json({
+      message: `Found ${posts.length} posts from IP: ${ipAddress}`,
+      posts: postsWithIP,
+      count: posts.length,
+      ipAddress: ipAddress,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error searching posts by IP", error: error.message });
+  }
+});
+
+// GET /api/v1/posts/admin/ip-stats - Admin endpoint to get IP address statistics
+router.get("/admin/ip-stats", async (req, res) => {
+  try {
+    // Check admin key from headers
+    const adminKey = req.headers["admin-key"];
+    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    // Aggregate posts by IP address
+    const ipStats = await Post.aggregate([
+      {
+        $match: { ipAddress: { $exists: true, $ne: null } },
+      },
+      {
+        $group: {
+          _id: "$ipAddress",
+          count: { $sum: 1 },
+          lastPost: { $max: "$createdAt" },
+          firstPost: { $min: "$createdAt" },
+        },
+      },
+      {
+        $sort: { count: -1 },
+      },
+    ]);
+
+    res.json({
+      message: "IP address statistics",
+      totalUniqueIPs: ipStats.length,
+      ipStats: ipStats,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error getting IP statistics", error: error.message });
   }
 });
 

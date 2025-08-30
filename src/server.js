@@ -13,6 +13,9 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+// Trust proxy to get real IP addresses
+app.set("trust proxy", true);
+
 // CORS configuration for production
 const corsOptions = {
   origin: [

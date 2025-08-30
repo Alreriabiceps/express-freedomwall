@@ -119,6 +119,7 @@ const postSchema = new mongoose.Schema(
     isHidden: { type: Boolean, default: false },
     isFlagged: { type: Boolean, default: false },
     engagementScore: { type: Number, default: 0 },
+    ipAddress: { type: String, required: false }, // IP address of the user who created the post
   },
   { timestamps: true }
 );
