@@ -20,18 +20,49 @@ app.set("trust proxy", true);
 
 // CORS configuration for production
 const corsOptions = {
-  origin: [
-    "http://localhost:3000", // Development
-    "http://localhost:3001", // Vite dev server (port 3001)
-    "http://localhost:3002", // Vite dev server (port 3002)
-    "http://localhost:5173", // Vite dev server
-    "https://isfreedomwall.vercel.app", // Your new Vercel domain
-    "https://*.vercel.app", // Vercel preview deployments
-    process.env.FRONTEND_URL, // Custom frontend URL from environment
-  ].filter(Boolean),
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      "http://localhost:3000", // Development
+      "http://localhost:3001", // Vite dev server (port 3001)
+      "http://localhost:3002", // Vite dev server (port 3002)
+      "http://localhost:5173", // Vite dev server
+      "https://isfreedomwall.vercel.app", // Your Vercel domain
+      "https://*.vercel.app", // Vercel preview deployments
+      process.env.FRONTEND_URL, // Custom frontend URL from environment
+    ].filter(Boolean);
+    
+    // Check if origin is allowed
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (allowedOrigin.includes('*')) {
+        // Handle wildcard domains
+        const domain = allowedOrigin.replace('*.', '');
+        return origin.endsWith(domain);
+      }
+      return allowedOrigin === origin;
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'user-id', 'admin-key'],
 };
+
+// Add CORS debugging middleware
+app.use((req, res, next) => {
+  console.log('Request origin:', req.headers.origin);
+  console.log('Request method:', req.method);
+  next();
+});
 
 app.use(cors(corsOptions));
 app.use(express.json());
