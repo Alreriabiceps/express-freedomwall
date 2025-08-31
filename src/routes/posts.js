@@ -1,6 +1,7 @@
 import express from "express";
 import Post from "../models/Post.js";
 import { getRealIP, sanitizeIP } from "../utils/ipUtils.js";
+import { getOrCreateSessionId } from "../utils/sessionManager.js";
 import {
   postRateLimiter,
   commentRateLimiter,
@@ -8,11 +9,10 @@ import {
   reportRateLimiter,
   getPostsRateLimiter,
 } from "../middleware/rateLimiter.js";
-// import {
-//   validatePostContent,
-//   validateCommentContent,
-//   sanitizeBody,
-// } from "../middleware/sanitizer.js";
+import {
+  sessionPostRateLimiter,
+  sessionCommentRateLimiter,
+} from "../middleware/sessionRateLimiter.js";
 
 const router = express.Router();
 
@@ -31,38 +31,31 @@ router.get("/", getPostsRateLimiter, async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
     const userId = req.query.userId || req.headers["user-id"];
-    const sortBy = req.query.sort || "default"; // New: support for sort parameter
+    const sortBy = req.query.sort || "default";
 
     let allPosts;
 
     if (sortBy === "recent") {
-      // Sort purely by creation date (most recent first)
       allPosts = await Post.find({
         isHidden: false,
       }).sort({ createdAt: -1 });
     } else {
-      // Default sorting: popular first, then recent
-      // Get popular posts first (engagement score >= 5)
       const popularPosts = await Post.find({
         isHidden: false,
         engagementScore: { $gte: 5 },
       }).sort({ engagementScore: -1, createdAt: -1 });
 
-      // Get recent posts (engagement score < 5)
       const recentPosts = await Post.find({
         isHidden: false,
         engagementScore: { $lt: 5 },
       }).sort({ createdAt: -1 });
 
-      // Combine: popular posts first, then recent posts
       allPosts = [...popularPosts, ...recentPosts];
     }
 
-    // Add user like status to posts if userId is provided
     if (userId) {
       allPosts.forEach((post) => {
         try {
-          // Ensure likedBy field exists for existing posts
           if (!post.likedBy) {
             post.likedBy = [];
           }
@@ -77,13 +70,9 @@ router.get("/", getPostsRateLimiter, async (req, res) => {
       });
     }
 
-    // Apply pagination
     const paginatedPosts = allPosts.slice(skip, skip + limit);
-
-    // Check if there are more posts
     const hasMore = allPosts.length > skip + limit;
 
-    // Always return the new paginated format
     res.json({
       posts: paginatedPosts,
       currentPage: page,
@@ -99,33 +88,49 @@ router.get("/", getPostsRateLimiter, async (req, res) => {
   }
 });
 
-// Create a new post
+// Create a new post with enhanced tracking
 router.post(
   "/",
-  postRateLimiter,
-  // validatePostContent,
-  // sanitizeBody,
+  sessionPostRateLimiter, // Use session-based rate limiting
   async (req, res) => {
     try {
+      // Get or create session ID
+      const sessionId = getOrCreateSessionId(req, res);
+
       // Get the real IP address
       const realIP = getRealIP(req);
       const sanitizedIP = sanitizeIP(realIP);
 
-      // Create post data with IP address
+      // Get User-Agent
+      const userAgent = req.headers["user-agent"] || "unknown";
+
+      // Create post data with all tracking information
       const postData = {
         ...req.body,
         ipAddress: sanitizedIP,
+        userAgent: userAgent,
+        sessionId: sessionId,
+        postedAt: new Date(),
       };
 
       const post = new Post(postData);
       await post.save();
 
-      // Log the IP address for moderation purposes
-      console.log(`New post created from IP: ${sanitizedIP}`);
+      // Enhanced logging for moderation
+      console.log(`=== NEW POST CREATED ===`);
+      console.log(`Time: ${new Date().toISOString()}`);
+      console.log(`IP Address: ${sanitizedIP}`);
+      console.log(`Session ID: ${sessionId}`);
+      console.log(`User-Agent: ${userAgent}`);
+      console.log(`Message: ${req.body.message.substring(0, 50)}...`);
+      console.log(`========================`);
 
-      // Don't send IP address in response for security
+      // Don't send tracking data in response for security
       const postResponse = post.toObject();
       delete postResponse.ipAddress;
+      delete postResponse.userAgent;
+      delete postResponse.sessionId;
+      delete postResponse.postedAt;
 
       res.status(201).json(postResponse);
     } catch (error) {
@@ -136,12 +141,10 @@ router.post(
   }
 );
 
-// Add a comment to a post
+// Add a comment to a post with session tracking
 router.post(
   "/:id/comment",
-  commentRateLimiter,
-  // validateCommentContent,
-  // sanitizeBody,
+  sessionCommentRateLimiter, // Use session-based rate limiting
   async (req, res) => {
     try {
       const post = await Post.findById(req.params.id);
@@ -149,8 +152,24 @@ router.post(
         return res.status(404).json({ message: "Post not found" });
       }
 
-      post.comments.push(req.body);
+      // Get session ID for tracking
+      const sessionId = getOrCreateSessionId(req, res);
+
+      // Add session ID to comment data
+      const commentData = {
+        ...req.body,
+        sessionId: sessionId,
+        postedAt: new Date(),
+      };
+
+      post.comments.push(commentData);
       await post.save();
+
+      // Log comment creation
+      console.log(
+        `Comment added by session: ${sessionId} to post: ${req.params.id}`
+      );
+
       res.json(post);
     } catch (error) {
       res
@@ -168,15 +187,12 @@ router.post("/:id/like", likeRateLimiter, async (req, res) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    // Get user identifier from request body or headers
     const userId = req.body.userId || req.headers["user-id"] || req.ip;
 
-    // Additional validation: ensure userId is not empty
     if (!userId || userId.trim() === "") {
       return res.status(400).json({ message: "Invalid user identifier" });
     }
 
-    // Use the toggleLike method to handle like/unlike
     const result = post.toggleLike(userId);
     await post.save();
 
@@ -214,7 +230,6 @@ router.post("/:id/report", reportRateLimiter, async (req, res) => {
 
 // ===== COMMENT REACTIONS =====
 
-// POST /api/v1/posts/:postId/comments/:commentIndex/react - React to a comment
 router.post(
   "/:postId/comments/:commentIndex/react",
   commentRateLimiter,
@@ -223,7 +238,6 @@ router.post(
       const { postId, commentIndex } = req.params;
       const { reaction, userId } = req.body;
 
-      // Validate reaction type
       if (!["thumbsUp", "thumbsDown"].includes(reaction)) {
         return res.status(400).json({
           message: "Invalid reaction type. Must be 'thumbsUp' or 'thumbsDown'",
@@ -234,26 +248,19 @@ router.post(
         return res.status(400).json({ message: "userId is required" });
       }
 
-      // Find the post
       const post = await Post.findById(postId);
       if (!post) {
         return res.status(404).json({ message: "Post not found" });
       }
 
-      // Check if comment index is valid
       if (commentIndex < 0 || commentIndex >= post.comments.length) {
         return res.status(404).json({ message: "Comment not found" });
       }
 
       const comment = post.comments[commentIndex];
-
-      // Handle the reaction using the comment method
       const result = comment.handleReaction(userId, reaction);
-
-      // Save the post to persist changes
       await post.save();
 
-      // Return updated comment data
       res.json({
         message: "Reaction updated successfully",
         result,
@@ -275,10 +282,9 @@ router.post(
 
 // ===== ADMIN ROUTES =====
 
-// GET /api/v1/posts/admin - Admin endpoint to see all posts (including hidden)
+// GET /api/v1/posts/admin - Admin endpoint to see all posts with tracking data
 router.get("/admin", async (req, res) => {
   try {
-    // Check admin key from headers
     const adminKey = req.headers["admin-key"];
     if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -286,16 +292,19 @@ router.get("/admin", async (req, res) => {
 
     const posts = await Post.find({}).sort({ createdAt: -1 });
 
-    // Include IP addresses for admin view
-    const postsWithIP = posts.map((post) => {
+    // Include all tracking data for admin view
+    const postsWithTracking = posts.map((post) => {
       const postObj = post.toObject();
       return {
         ...postObj,
         ipAddress: postObj.ipAddress || "unknown",
+        userAgent: postObj.userAgent || "unknown",
+        sessionId: postObj.sessionId || "unknown",
+        postedAt: postObj.postedAt || postObj.createdAt,
       };
     });
 
-    res.json(postsWithIP);
+    res.json(postsWithTracking);
   } catch (error) {
     res
       .status(500)
@@ -308,7 +317,6 @@ router.put("/:id/status", async (req, res) => {
   try {
     const { isHidden, isFlagged, adminNotes } = req.body;
 
-    // Check admin key from headers
     const adminKey = req.headers["admin-key"];
     if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -319,16 +327,14 @@ router.put("/:id/status", async (req, res) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    // Update post status
     if (isHidden !== undefined) post.isHidden = isHidden;
     if (isFlagged !== undefined) post.isFlagged = isFlagged;
     if (adminNotes !== undefined) post.adminNotes = adminNotes;
 
     await post.save();
 
-    // Return post with IP address for admin view
-    const postWithIP = post.toObject();
-    res.json(postWithIP);
+    const postWithTracking = post.toObject();
+    res.json(postWithTracking);
   } catch (error) {
     res
       .status(500)
@@ -339,7 +345,6 @@ router.put("/:id/status", async (req, res) => {
 // DELETE /api/v1/posts/:id/comment/:commentIndex - Admin delete specific comment
 router.delete("/:id/comment/:commentIndex", async (req, res) => {
   try {
-    // Check admin key from headers
     const adminKey = req.headers["admin-key"];
     if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -352,16 +357,13 @@ router.delete("/:id/comment/:commentIndex", async (req, res) => {
       return res.status(404).json({ message: "Post not found" });
     }
 
-    // Check if comment index is valid
     if (commentIndex < 0 || commentIndex >= post.comments.length) {
       return res.status(404).json({ message: "Comment not found" });
     }
 
-    // Get comment details for logging
     const commentToDelete = post.comments[commentIndex];
     const commentText = commentToDelete.message.substring(0, 50);
 
-    // Remove the comment
     post.comments.splice(commentIndex, 1);
     await post.save();
 
@@ -380,7 +382,6 @@ router.delete("/:id/comment/:commentIndex", async (req, res) => {
 // DELETE /api/v1/posts/:id - Admin delete post
 router.delete("/:id", async (req, res) => {
   try {
-    // Check admin key from headers
     const adminKey = req.headers["admin-key"];
     if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -400,10 +401,11 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// GET /api/v1/posts/admin/ip/:ipAddress - Admin endpoint to find posts by IP address
+// ===== ENHANCED MODERATION ENDPOINTS =====
+
+// GET /api/v1/posts/admin/ip/:ipAddress - Find posts by IP address
 router.get("/admin/ip/:ipAddress", async (req, res) => {
   try {
-    // Check admin key from headers
     const adminKey = req.headers["admin-key"];
     if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
       return res.status(401).json({ message: "Unauthorized" });
@@ -411,7 +413,6 @@ router.get("/admin/ip/:ipAddress", async (req, res) => {
 
     const { ipAddress } = req.params;
 
-    // Find all posts from this IP address
     const posts = await Post.find({
       ipAddress: { $regex: ipAddress, $options: "i" },
     }).sort({ createdAt: -1 });
@@ -424,18 +425,20 @@ router.get("/admin/ip/:ipAddress", async (req, res) => {
       });
     }
 
-    // Include IP addresses for admin view
-    const postsWithIP = posts.map((post) => {
+    const postsWithTracking = posts.map((post) => {
       const postObj = post.toObject();
       return {
         ...postObj,
         ipAddress: postObj.ipAddress || "unknown",
+        userAgent: postObj.userAgent || "unknown",
+        sessionId: postObj.sessionId || "unknown",
+        postedAt: postObj.postedAt || postObj.createdAt,
       };
     });
 
     res.json({
       message: `Found ${posts.length} posts from IP: ${ipAddress}`,
-      posts: postsWithIP,
+      posts: postsWithTracking,
       count: posts.length,
       ipAddress: ipAddress,
     });
@@ -446,16 +449,63 @@ router.get("/admin/ip/:ipAddress", async (req, res) => {
   }
 });
 
-// GET /api/v1/posts/admin/ip-stats - Admin endpoint to get IP address statistics
-router.get("/admin/ip-stats", async (req, res) => {
+// GET /api/v1/posts/admin/session/:sessionId - Find posts by session ID
+router.get("/admin/session/:sessionId", async (req, res) => {
   try {
-    // Check admin key from headers
     const adminKey = req.headers["admin-key"];
     if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // Aggregate posts by IP address
+    const { sessionId } = req.params;
+
+    const posts = await Post.find({
+      sessionId: { $regex: sessionId, $options: "i" },
+    }).sort({ createdAt: -1 });
+
+    if (posts.length === 0) {
+      return res.json({
+        message: `No posts found from session: ${sessionId}`,
+        posts: [],
+        count: 0,
+      });
+    }
+
+    const postsWithTracking = posts.map((post) => {
+      const postObj = post.toObject();
+      return {
+        ...postObj,
+        ipAddress: postObj.ipAddress || "unknown",
+        userAgent: postObj.userAgent || "unknown",
+        sessionId: postObj.sessionId || "unknown",
+        postedAt: postObj.postedAt || postObj.createdAt,
+      };
+    });
+
+    res.json({
+      message: `Found ${posts.length} posts from session: ${sessionId}`,
+      posts: postsWithTracking,
+      count: posts.length,
+      sessionId: sessionId,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        message: "Error searching posts by session",
+        error: error.message,
+      });
+  }
+});
+
+// GET /api/v1/posts/admin/ip-stats - IP address statistics
+router.get("/admin/ip-stats", async (req, res) => {
+  try {
+    const adminKey = req.headers["admin-key"];
+    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
     const ipStats = await Post.aggregate([
       {
         $match: { ipAddress: { $exists: true, $ne: null } },
@@ -466,6 +516,12 @@ router.get("/admin/ip-stats", async (req, res) => {
           count: { $sum: 1 },
           lastPost: { $max: "$createdAt" },
           firstPost: { $min: "$createdAt" },
+          uniqueSessions: { $addToSet: "$sessionId" },
+        },
+      },
+      {
+        $addFields: {
+          uniqueSessionCount: { $size: "$uniqueSessions" },
         },
       },
       {
@@ -485,4 +541,98 @@ router.get("/admin/ip-stats", async (req, res) => {
   }
 });
 
+// GET /api/v1/posts/admin/session-stats - Session statistics
+router.get("/admin/session-stats", async (req, res) => {
+  try {
+    const adminKey = req.headers["admin-key"];
+    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const sessionStats = await Post.aggregate([
+      {
+        $match: { sessionId: { $exists: true, $ne: null } },
+      },
+      {
+        $group: {
+          _id: "$sessionId",
+          count: { $sum: 1 },
+          lastPost: { $max: "$createdAt" },
+          firstPost: { $min: "$createdAt" },
+          uniqueIPs: { $addToSet: "$ipAddress" },
+        },
+      },
+      {
+        $addFields: {
+          uniqueIPCount: { $size: "$uniqueIPs" },
+        },
+      },
+      {
+        $sort: { count: -1 },
+      },
+    ]);
+
+    res.json({
+      message: "Session statistics",
+      totalUniqueSessions: sessionStats.length,
+      sessionStats: sessionStats,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        message: "Error getting session statistics",
+        error: error.message,
+      });
+  }
+});
+
+// GET /api/v1/posts/admin/tracking-summary - Overall tracking summary
+router.get("/admin/tracking-summary", async (req, res) => {
+  try {
+    const adminKey = req.headers["admin-key"];
+    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const summary = await Post.aggregate([
+      {
+        $facet: {
+          totalPosts: [{ $count: "count" }],
+          postsWithIP: [
+            { $match: { ipAddress: { $exists: true, $ne: null } } },
+            { $count: "count" },
+          ],
+          postsWithSession: [
+            { $match: { sessionId: { $exists: true, $ne: null } } },
+            { $count: "count" },
+          ],
+          postsWithUserAgent: [
+            { $match: { userAgent: { $exists: true, $ne: null } } },
+            { $count: "count" },
+          ],
+          uniqueIPs: [{ $group: { _id: "$ipAddress" } }, { $count: "count" }],
+          uniqueSessions: [
+            { $group: { _id: "$sessionId" } },
+            { $count: "count" },
+          ],
+        },
+      },
+    ]);
+
+    res.json({
+      message: "Tracking summary",
+      summary: summary[0],
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        message: "Error getting tracking summary",
+        error: error.message,
+      });
+  }
+});
+
 export default router;
+

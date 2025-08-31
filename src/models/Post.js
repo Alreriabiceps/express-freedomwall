@@ -120,6 +120,9 @@ const postSchema = new mongoose.Schema(
     isFlagged: { type: Boolean, default: false },
     engagementScore: { type: Number, default: 0 },
     ipAddress: { type: String, required: false }, // IP address of the user who created the post
+    userAgent: { type: String, required: false }, // Browser and OS information
+    sessionId: { type: String, required: false }, // Unique session identifier
+    postedAt: { type: Date, default: Date.now }, // Timestamp when the post was created
   },
   { timestamps: true }
 );
