@@ -41,7 +41,7 @@ router.post("/", async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { word, reason } = req.body;
+    const { word } = req.body;
     if (!word || !word.trim()) {
       return res.status(400).json({ message: "Word is required" });
     }
@@ -57,7 +57,6 @@ router.post("/", async (req, res) => {
 
     const bannedWord = new BannedWord({
       word: word.toLowerCase().trim(),
-      reason: reason?.trim() || "",
     });
 
     await bannedWord.save();
@@ -76,11 +75,10 @@ router.put("/:id", async (req, res) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { word, reason, isActive } = req.body;
+    const { word, isActive } = req.body;
     const updates = {};
 
     if (word !== undefined) updates.word = word.toLowerCase().trim();
-    if (reason !== undefined) updates.reason = reason?.trim() || "";
     if (isActive !== undefined) updates.isActive = isActive;
 
     const bannedWord = await BannedWord.findByIdAndUpdate(

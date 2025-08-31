@@ -13,10 +13,6 @@ const bannedWordSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    reason: {
-      type: String,
-      trim: true,
-    },
     addedBy: {
       type: String,
       default: "Admin",
