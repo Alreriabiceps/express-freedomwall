@@ -1,4 +1,10 @@
-// Input sanitization middleware - DISABLED for complete freedom
+// Input sanitization middleware with Filipino foul language filtering
+
+// Import the Filipino filter functions
+import {
+  censorFoulLanguage,
+  containsFoulLanguage,
+} from "../../utils/filipinoFilter.js";
 
 // HTML entities mapping for additional safety - DISABLED
 const htmlEntities = {
@@ -18,7 +24,7 @@ const escapeHtml = (text) => {
   return text; // Return text unchanged
 };
 
-// Sanitize text content - DISABLED
+// Sanitize text content with Filipino foul language filtering
 const sanitizeText = (text) => {
   if (typeof text !== "string") return text;
 
@@ -34,6 +40,10 @@ const sanitizeText = (text) => {
   sanitized = sanitized.replace(/on\w+\s*=/gi, "");
   sanitized = sanitized.replace(/data:/gi, "");
   sanitized = sanitized.replace(/vbscript:/gi, "");
+
+  // Apply Filipino foul language filtering
+  const censored = censorFoulLanguage(sanitized);
+  sanitized = censored.censoredText;
 
   // Enhanced censoring for "jeren" and variations
   const jerenPatterns = [
@@ -60,7 +70,7 @@ const sanitizeText = (text) => {
   return sanitized;
 };
 
-// Sanitize request body - DISABLED HTML encoding
+// Sanitize request body with Filipino foul language filtering
 export const sanitizeBody = (req, res, next) => {
   if (req.body) {
     // Set empty name to "Anonymous"
@@ -89,6 +99,11 @@ export const sanitizeBody = (req, res, next) => {
         req.body.name = req.body.name.replace(pattern, "*****");
       });
 
+      // Apply Filipino foul language filtering to names
+      const censoredName = censorFoulLanguage(req.body.name);
+      req.body.name = censoredName.censoredText;
+      req.body.nameWasCensored = censoredName.hasFoulLanguage;
+
       // NO HTML encoding - keep original text
       // req.body.name = escapeHtml(req.body.name);
     }
@@ -109,6 +124,17 @@ export const sanitizeBody = (req, res, next) => {
       jerenPatterns.forEach((pattern) => {
         req.body.message = req.body.message.replace(pattern, "*****");
       });
+
+      // Apply Filipino foul language filtering to messages
+      const censoredMessage = censorFoulLanguage(req.body.message);
+      req.body.message = censoredMessage.censoredText;
+      req.body.messageWasCensored = censoredMessage.hasFoulLanguage;
+      req.body.censoredWordCount = censoredMessage.censoredCount;
+
+      // Store original message if it was censored
+      if (censoredMessage.hasFoulLanguage) {
+        req.body.originalMessage = req.body.message;
+      }
 
       // NO HTML encoding - keep original text
       // req.body.message = escapeHtml(req.body.message);
@@ -141,6 +167,11 @@ export const sanitizeBody = (req, res, next) => {
         req.body.subject = req.body.subject.replace(pattern, "*****");
       });
 
+      // Apply Filipino foul language filtering to subject
+      const censoredSubject = censorFoulLanguage(req.body.subject);
+      req.body.subject = censoredSubject.censoredText;
+      req.body.subjectWasCensored = censoredSubject.hasFoulLanguage;
+
       // NO HTML encoding - keep original text
       // req.body.subject = escapeHtml(req.body.subject);
     }
@@ -164,12 +195,32 @@ export const sanitizeBody = (req, res, next) => {
           censoredName = censoredName.replace(pattern, "*****");
         });
 
+        // Apply Filipino foul language filtering to comment names
+        const censoredCommentName = censorFoulLanguage(censoredName);
+        censoredName = censoredCommentName.censoredText;
+
+        // Apply Filipino foul language filtering to comment messages
+        const censoredCommentMessage = censorFoulLanguage(comment.message);
+        const message = censoredCommentMessage.censoredText;
+
         return {
           name: censoredName, // NO HTML encoding
-          message: comment.message, // NO HTML encoding
+          message: message, // NO HTML encoding
           createdAt: comment.createdAt, // Keep original createdAt
+          wasCensored:
+            censoredCommentName.hasFoulLanguage ||
+            censoredCommentMessage.hasFoulLanguage,
         };
       });
+    }
+
+    // Log censoring statistics for monitoring
+    if (req.body.messageWasCensored || req.body.nameWasCensored) {
+      console.log(
+        `Content censored - Words: ${req.body.censoredWordCount || 0}, Name: ${
+          req.body.nameWasCensored
+        }, Message: ${req.body.messageWasCensored}`
+      );
     }
   }
 
@@ -277,19 +328,16 @@ export const validateContactContent = (req, res, next) => {
   // NO LENGTH LIMITS - complete freedom
   // if (name.length > 100) {
   //   return res
-  //     .status(400)
   //     .json({ message: "Name must be 100 characters or less" });
   // }
 
   // if (subject.length > 200) {
   //   return res
-  //     .status(400)
   //     .json({ message: "Subject must be 200 characters or less" });
   // }
 
   // if (message.length > 1000) {
   //   return res
-  //     .status(400)
   //     .json({ message: "Message must be 1000 characters or less" });
   // }
 
