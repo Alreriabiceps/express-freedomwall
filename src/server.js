@@ -23,7 +23,7 @@ const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     const allowedOrigins = [
       "http://localhost:3000", // Development
       "http://localhost:3001", // Vite dev server (port 3001)
@@ -33,34 +33,34 @@ const corsOptions = {
       "https://*.vercel.app", // Vercel preview deployments
       process.env.FRONTEND_URL, // Custom frontend URL from environment
     ].filter(Boolean);
-    
+
     // Check if origin is allowed
-    const isAllowed = allowedOrigins.some(allowedOrigin => {
-      if (allowedOrigin.includes('*')) {
+    const isAllowed = allowedOrigins.some((allowedOrigin) => {
+      if (allowedOrigin.includes("*")) {
         // Handle wildcard domains
-        const domain = allowedOrigin.replace('*.', '');
+        const domain = allowedOrigin.replace("*.", "");
         return origin.endsWith(domain);
       }
       return allowedOrigin === origin;
     });
-    
+
     if (isAllowed) {
       callback(null, true);
     } else {
-      console.log('CORS blocked origin:', origin);
-      callback(new Error('Not allowed by CORS'));
+      console.log("CORS blocked origin:", origin);
+      callback(new Error("Not allowed by CORS"));
     }
   },
   credentials: true,
   optionsSuccessStatus: 200,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'user-id', 'admin-key'],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "user-id", "admin-key"],
 };
 
 // Add CORS debugging middleware
 app.use((req, res, next) => {
-  console.log('Request origin:', req.headers.origin);
-  console.log('Request method:', req.method);
+  console.log("Request origin:", req.headers.origin);
+  console.log("Request method:", req.method);
   next();
 });
 
