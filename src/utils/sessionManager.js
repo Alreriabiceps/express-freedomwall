@@ -74,3 +74,4 @@ export function isValidSessionId(sessionId) {
   return /^[a-f0-9]{64}$/.test(sessionId); // 64 character hex string
 }
 
+
