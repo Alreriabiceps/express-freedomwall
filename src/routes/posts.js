@@ -489,12 +489,10 @@ router.get("/admin/session/:sessionId", async (req, res) => {
       sessionId: sessionId,
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "Error searching posts by session",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error searching posts by session",
+      error: error.message,
+    });
   }
 });
 
@@ -578,12 +576,10 @@ router.get("/admin/session-stats", async (req, res) => {
       sessionStats: sessionStats,
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "Error getting session statistics",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error getting session statistics",
+      error: error.message,
+    });
   }
 });
 
@@ -625,14 +621,11 @@ router.get("/admin/tracking-summary", async (req, res) => {
       summary: summary[0],
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "Error getting tracking summary",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Error getting tracking summary",
+      error: error.message,
+    });
   }
 });
 
 export default router;
-

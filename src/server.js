@@ -7,6 +7,7 @@ import postsRouter from "./routes/posts.js";
 import contactRouter from "./routes/contact.js";
 import pollsRouter from "./routes/polls.js";
 import announcementsRouter from "./routes/announcements.js";
+import bannedWordsRouter from "./routes/banned-words.js";
 
 dotenv.config();
 
@@ -21,6 +22,8 @@ app.set("trust proxy", true);
 const corsOptions = {
   origin: [
     "http://localhost:3000", // Development
+    "http://localhost:3001", // Vite dev server (port 3001)
+    "http://localhost:3002", // Vite dev server (port 3002)
     "http://localhost:5173", // Vite dev server
     "https://isfreedomwall.vercel.app", // Your new Vercel domain
     "https://*.vercel.app", // Vercel preview deployments
@@ -45,6 +48,7 @@ app.use("/api/v1/posts", postsRouter);
 app.use("/api/v1/contact", contactRouter);
 app.use("/api/v1/polls", pollsRouter);
 app.use("/api/v1/announcements", announcementsRouter);
+app.use("/api/v1/banned-words", bannedWordsRouter);
 
 // Health check
 app.get("/health", (req, res) => {
