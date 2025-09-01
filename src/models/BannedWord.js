@@ -23,8 +23,7 @@ const bannedWordSchema = new mongoose.Schema(
   }
 );
 
-// Create index for faster word searches
-bannedWordSchema.index({ word: 1 });
+// Create index for isActive field only
 bannedWordSchema.index({ isActive: 1 });
 
 const BannedWord = mongoose.model("BannedWord", bannedWordSchema);

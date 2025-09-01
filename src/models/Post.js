@@ -118,6 +118,7 @@ const postSchema = new mongoose.Schema(
     reportCount: { type: Number, default: 0 },
     isHidden: { type: Boolean, default: false },
     isFlagged: { type: Boolean, default: false },
+    isPinned: { type: Boolean, default: false },
     engagementScore: { type: Number, default: 0 },
     ipAddress: { type: String, required: false }, // IP address of the user who created the post
     userAgent: { type: String, required: false }, // Browser and OS information

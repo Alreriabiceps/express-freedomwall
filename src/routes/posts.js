@@ -36,21 +36,15 @@ router.get("/", getPostsRateLimiter, async (req, res) => {
     let allPosts;
 
     if (sortBy === "recent") {
+      // For recent sorting: pinned posts first, then by creation date
       allPosts = await Post.find({
         isHidden: false,
-      }).sort({ createdAt: -1 });
+      }).sort({ isPinned: -1, createdAt: -1 });
     } else {
-      const popularPosts = await Post.find({
+      // For default/popular sorting: pinned posts first, then by engagement score
+      allPosts = await Post.find({
         isHidden: false,
-        engagementScore: { $gte: 5 },
-      }).sort({ engagementScore: -1, createdAt: -1 });
-
-      const recentPosts = await Post.find({
-        isHidden: false,
-        engagementScore: { $lt: 5 },
-      }).sort({ createdAt: -1 });
-
-      allPosts = [...popularPosts, ...recentPosts];
+      }).sort({ isPinned: -1, engagementScore: -1, createdAt: -1 });
     }
 
     if (userId) {
@@ -315,7 +309,7 @@ router.get("/admin", async (req, res) => {
 // PUT /api/v1/posts/:id/status - Admin update post status
 router.put("/:id/status", async (req, res) => {
   try {
-    const { isHidden, isFlagged, adminNotes } = req.body;
+    const { isHidden, isFlagged, isPinned, adminNotes } = req.body;
 
     const adminKey = req.headers["admin-key"];
     if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
@@ -329,6 +323,7 @@ router.put("/:id/status", async (req, res) => {
 
     if (isHidden !== undefined) post.isHidden = isHidden;
     if (isFlagged !== undefined) post.isFlagged = isFlagged;
+    if (isPinned !== undefined) post.isPinned = isPinned;
     if (adminNotes !== undefined) post.adminNotes = adminNotes;
 
     await post.save();
