@@ -133,9 +133,8 @@ io.on("connection", (socket) => {
   const penName = socket.handshake.query.penName;
   console.log(`User ${penName} connected to world chat`);
   console.log(`Socket ID: ${socket.id}`);
-  console.log(`Socket handshake:`, socket.handshake);
 
-  // Add user to online users
+  // Add user to online users immediately
   const user = {
     id: socket.id,
     penName: penName,
@@ -143,24 +142,28 @@ io.on("connection", (socket) => {
   };
   onlineUsers.set(socket.id, user);
 
-  // Broadcast user joined
+  // Broadcast user joined immediately
   socket.broadcast.emit("userJoined", user);
 
-  // Send current online users to the new user
+  // Send current online users immediately
   socket.emit("onlineUsers", Array.from(onlineUsers.values()));
 
-  // Send message history to new user
-  ChatMessage.find({ messageType: "user" })
-    .sort({ timestamp: -1 })
-    .limit(50)
-    .lean()
-    .then((messages) => {
+  // Send message history asynchronously (non-blocking)
+  setImmediate(async () => {
+    try {
+      const messages = await ChatMessage.find({ messageType: "user" })
+        .sort({ timestamp: -1 })
+        .limit(20) // Reduced from 50 to 20 for faster loading
+        .lean();
+
       const reversedMessages = messages.reverse();
       socket.emit("messageHistory", reversedMessages);
-    })
-    .catch((err) => {
+    } catch (err) {
       console.error("Error fetching message history:", err);
-    });
+      // Send empty history on error to not block connection
+      socket.emit("messageHistory", []);
+    }
+  });
 
   // Handle new messages
   socket.on("sendMessage", async (messageData) => {
