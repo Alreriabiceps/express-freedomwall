@@ -57,7 +57,7 @@ const corsOptions = {
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "user-id", "admin-key"],
+  allowedHeaders: ["Content-Type", "Authorization", "user-id"],
 };
 
 // Add CORS debugging middleware
@@ -88,7 +88,7 @@ const io = new Server(server, {
     ].filter(Boolean),
     credentials: false,
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "user-id", "admin-key"],
+    allowedHeaders: ["Content-Type", "Authorization", "user-id"],
   },
   allowEIO3: true,
   transports: ["websocket", "polling"], // WebSocket first for speed

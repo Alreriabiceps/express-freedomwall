@@ -1,5 +1,6 @@
 import express from "express";
 import Announcement from "../models/Announcement.js";
+import { requireAdminAuth } from "../middleware/adminAuth.js";
 import { getPostsRateLimiter } from "../middleware/rateLimiter.js";
 
 const router = express.Router();
@@ -32,13 +33,8 @@ router.get("/", getPostsRateLimiter, async (req, res) => {
 // ===== ADMIN ROUTES =====
 
 // GET /api/v1/announcements/admin - Admin endpoint to see all announcements
-router.get("/admin", async (req, res) => {
+router.get("/admin", requireAdminAuth, async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const announcements = await Announcement.find({}).sort({ createdAt: -1 });
     res.json(announcements);
   } catch (error) {
@@ -50,13 +46,8 @@ router.get("/admin", async (req, res) => {
 });
 
 // POST /api/v1/announcements - Admin create new announcement
-router.post("/", async (req, res) => {
+router.post("/", requireAdminAuth, async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const { title, message, type, expiresAt, adminNotes } = req.body;
 
     // Validate required fields
@@ -86,13 +77,8 @@ router.post("/", async (req, res) => {
 });
 
 // PUT /api/v1/announcements/:id - Admin update announcement
-router.put("/:id", async (req, res) => {
+router.put("/:id", requireAdminAuth, async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const { title, message, type, expiresAt, isActive, adminNotes } = req.body;
 
     const announcement = await Announcement.findById(req.params.id);
@@ -119,13 +105,8 @@ router.put("/:id", async (req, res) => {
 });
 
 // DELETE /api/v1/announcements/:id - Admin delete announcement
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireAdminAuth, async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const announcement = await Announcement.findByIdAndDelete(req.params.id);
     if (!announcement) {
       return res.status(404).json({ message: "Announcement not found" });

@@ -1,5 +1,6 @@
 import express from "express";
 import Poll from "../models/Poll.js";
+import { requireAdminAuth } from "../middleware/adminAuth.js";
 import { getPostsRateLimiter } from "../middleware/rateLimiter.js";
 // import { sanitizeBody } from "../middleware/sanitizer.js";
 
@@ -170,13 +171,9 @@ router.get("/:id/results", getPostsRateLimiter, async (req, res) => {
 // ===== ADMIN ROUTES =====
 
 // GET /api/v1/polls/admin - Admin endpoint to see all polls (including inactive)
-router.get("/admin", async (req, res) => {
+router.get("/admin", requireAdminAuth, async (req, res) => {
   try {
     // Check admin key from headers
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
 
     const polls = await Poll.find({}).sort({ createdAt: -1 });
     res.json(polls);
@@ -188,15 +185,11 @@ router.get("/admin", async (req, res) => {
 });
 
 // PUT /api/v1/polls/:id/status - Admin update poll status
-router.put("/:id/status", async (req, res) => {
+router.put("/:id/status", requireAdminAuth, async (req, res) => {
   try {
     const { isActive, adminNotes } = req.body;
 
     // Check admin key from headers
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
 
     const poll = await Poll.findById(req.params.id);
     if (!poll) {
@@ -217,13 +210,9 @@ router.put("/:id/status", async (req, res) => {
 });
 
 // DELETE /api/v1/polls/:id - Admin delete poll
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireAdminAuth, async (req, res) => {
   try {
     // Check admin key from headers
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
 
     const poll = await Poll.findByIdAndDelete(req.params.id);
     if (!poll) {

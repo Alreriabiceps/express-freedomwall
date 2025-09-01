@@ -1,5 +1,6 @@
 import express from "express";
 import Contact from "../models/Contact.js";
+import { requireAdminAuth } from "../middleware/adminAuth.js";
 import { contactRateLimiter } from "../middleware/rateLimiter.js";
 // import {
 //   sanitizeAll,
@@ -37,14 +38,8 @@ router.post(
 );
 
 // GET /api/v1/contact/admin - Admin endpoint to see all contact messages
-router.get("/admin", async (req, res) => {
+router.get("/admin", requireAdminAuth, async (req, res) => {
   try {
-    // Check admin key from headers
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
-
     const contacts = await Contact.find().sort({ createdAt: -1 });
     res.json(contacts);
   } catch (error) {
@@ -55,16 +50,10 @@ router.get("/admin", async (req, res) => {
 });
 
 // PUT /api/v1/contact/:id/status - Admin update contact status
-router.put("/:id/status", async (req, res) => {
+router.put("/:id/status", requireAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, isRead, adminNotes } = req.body;
-    const adminKey = req.headers["admin-key"];
-
-    // Simple admin key check
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
 
     const contact = await Contact.findById(id);
     if (!contact) {
@@ -90,15 +79,9 @@ router.put("/:id/status", async (req, res) => {
 });
 
 // DELETE /api/v1/contact/:id - Admin delete contact message
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const adminKey = req.headers["admin-key"];
-
-    // Simple admin key check
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(403).json({ message: "Unauthorized" });
-    }
 
     const contact = await Contact.findByIdAndDelete(id);
     if (!contact) {

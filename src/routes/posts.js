@@ -13,6 +13,7 @@ import {
   sessionPostRateLimiter,
   sessionCommentRateLimiter,
 } from "../middleware/sessionRateLimiter.js";
+import { requireAdminAuth, checkAdminAuth } from "../middleware/adminAuth.js";
 
 const router = express.Router();
 
@@ -276,14 +277,56 @@ router.post(
 
 // ===== ADMIN ROUTES =====
 
-// GET /api/v1/posts/admin - Admin endpoint to see all posts with tracking data
-router.get("/admin", async (req, res) => {
+// POST /api/v1/posts/admin/login - Admin login endpoint
+router.post("/admin/login", async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
+    const { adminKey } = req.body;
+
+    if (!adminKey || adminKey !== process.env.ADMIN_KEY) {
+      return res.status(401).json({ message: "Invalid admin key" });
     }
 
+    // Set admin session
+    req.session.isAdmin = true;
+    req.session.adminLoginTime = new Date();
+
+    res.json({ message: "Admin login successful" });
+  } catch (error) {
+    res.status(500).json({ message: "Login error", error: error.message });
+  }
+});
+
+// POST /api/v1/posts/admin/logout - Admin logout endpoint
+router.post("/admin/logout", async (req, res) => {
+  try {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Logout error" });
+      }
+      res.clearCookie("connect.sid"); // Clear session cookie
+      res.json({ message: "Admin logout successful" });
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Logout error", error: error.message });
+  }
+});
+
+// GET /api/v1/posts/admin/auth-check - Check if admin is authenticated
+router.get("/admin/auth-check", async (req, res) => {
+  try {
+    if (checkAdminAuth(req)) {
+      res.json({ authenticated: true });
+    } else {
+      res.status(401).json({ authenticated: false });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Auth check error", error: error.message });
+  }
+});
+
+// GET /api/v1/posts/admin - Admin endpoint to see all posts with tracking data
+router.get("/admin", requireAdminAuth, async (req, res) => {
+  try {
     const posts = await Post.find({}).sort({ createdAt: -1 });
 
     // Include all tracking data for admin view
@@ -307,14 +350,9 @@ router.get("/admin", async (req, res) => {
 });
 
 // PUT /api/v1/posts/:id/status - Admin update post status
-router.put("/:id/status", async (req, res) => {
+router.put("/:id/status", requireAdminAuth, async (req, res) => {
   try {
     const { isHidden, isFlagged, isPinned, adminNotes } = req.body;
-
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
 
     const post = await Post.findById(req.params.id);
     if (!post) {
@@ -338,50 +376,46 @@ router.put("/:id/status", async (req, res) => {
 });
 
 // DELETE /api/v1/posts/:id/comment/:commentIndex - Admin delete specific comment
-router.delete("/:id/comment/:commentIndex", async (req, res) => {
-  try {
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
+router.delete(
+  "/:id/comment/:commentIndex",
+  requireAdminAuth,
+  async (req, res) => {
+    try {
+      const { id, commentIndex } = req.params;
+      const post = await Post.findById(id);
+
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+
+      if (commentIndex < 0 || commentIndex >= post.comments.length) {
+        return res.status(404).json({ message: "Comment not found" });
+      }
+
+      const commentToDelete = post.comments[commentIndex];
+      const commentText = commentToDelete.message.substring(0, 50);
+
+      post.comments.splice(commentIndex, 1);
+      await post.save();
+
+      console.log(
+        `Comment "${commentText}..." deleted by admin from post ${id}`
+      );
+      res.json({
+        message: "Comment deleted successfully",
+        remainingComments: post.comments.length,
+      });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ message: "Error deleting comment", error: error.message });
     }
-
-    const { id, commentIndex } = req.params;
-    const post = await Post.findById(id);
-
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
-    }
-
-    if (commentIndex < 0 || commentIndex >= post.comments.length) {
-      return res.status(404).json({ message: "Comment not found" });
-    }
-
-    const commentToDelete = post.comments[commentIndex];
-    const commentText = commentToDelete.message.substring(0, 50);
-
-    post.comments.splice(commentIndex, 1);
-    await post.save();
-
-    console.log(`Comment "${commentText}..." deleted by admin from post ${id}`);
-    res.json({
-      message: "Comment deleted successfully",
-      remainingComments: post.comments.length,
-    });
-  } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Error deleting comment", error: error.message });
   }
-});
+);
 
 // DELETE /api/v1/posts/:id - Admin delete post
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireAdminAuth, async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const post = await Post.findByIdAndDelete(req.params.id);
     if (!post) {
       return res.status(404).json({ message: "Post not found" });
@@ -399,13 +433,8 @@ router.delete("/:id", async (req, res) => {
 // ===== ENHANCED MODERATION ENDPOINTS =====
 
 // GET /api/v1/posts/admin/ip/:ipAddress - Find posts by IP address
-router.get("/admin/ip/:ipAddress", async (req, res) => {
+router.get("/admin/ip/:ipAddress", requireAdminAuth, async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const { ipAddress } = req.params;
 
     const posts = await Post.find({
@@ -445,13 +474,8 @@ router.get("/admin/ip/:ipAddress", async (req, res) => {
 });
 
 // GET /api/v1/posts/admin/session/:sessionId - Find posts by session ID
-router.get("/admin/session/:sessionId", async (req, res) => {
+router.get("/admin/session/:sessionId", requireAdminAuth, async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const { sessionId } = req.params;
 
     const posts = await Post.find({
@@ -492,13 +516,8 @@ router.get("/admin/session/:sessionId", async (req, res) => {
 });
 
 // GET /api/v1/posts/admin/ip-stats - IP address statistics
-router.get("/admin/ip-stats", async (req, res) => {
+router.get("/admin/ip-stats", requireAdminAuth, async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const ipStats = await Post.aggregate([
       {
         $match: { ipAddress: { $exists: true, $ne: null } },
@@ -535,13 +554,8 @@ router.get("/admin/ip-stats", async (req, res) => {
 });
 
 // GET /api/v1/posts/admin/session-stats - Session statistics
-router.get("/admin/session-stats", async (req, res) => {
+router.get("/admin/session-stats", requireAdminAuth, async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const sessionStats = await Post.aggregate([
       {
         $match: { sessionId: { $exists: true, $ne: null } },
@@ -579,13 +593,8 @@ router.get("/admin/session-stats", async (req, res) => {
 });
 
 // GET /api/v1/posts/admin/tracking-summary - Overall tracking summary
-router.get("/admin/tracking-summary", async (req, res) => {
+router.get("/admin/tracking-summary", requireAdminAuth, async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (adminKey !== process.env.ADMIN_KEY || !adminKey) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const summary = await Post.aggregate([
       {
         $facet: {

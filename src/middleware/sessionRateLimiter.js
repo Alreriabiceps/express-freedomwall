@@ -1,5 +1,6 @@
 import rateLimit from "express-rate-limit";
 import { getSessionIdFromCookie } from "../utils/sessionManager.js";
+import { checkAdminAuth } from "./adminAuth.js";
 
 /**
  * Session-based rate limiter for posts
@@ -24,8 +25,7 @@ export const sessionPostRateLimiter = rateLimit({
   },
   // Skip rate limiting for admin requests
   skip: (req) => {
-    const adminKey = req.headers["admin-key"];
-    return adminKey === process.env.ADMIN_KEY;
+    return checkAdminAuth(req);
   },
   // Custom handler for rate limit exceeded
   handler: (req, res) => {
@@ -66,8 +66,6 @@ export const sessionCommentRateLimiter = rateLimit({
     return sessionId || req.ip;
   },
   skip: (req) => {
-    const adminKey = req.headers["admin-key"];
-    return adminKey === process.env.ADMIN_KEY;
+    return checkAdminAuth(req);
   },
 });
-

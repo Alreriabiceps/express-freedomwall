@@ -1,5 +1,6 @@
 import express from "express";
 import BannedWord from "../models/BannedWord.js";
+import { requireAdminAuth } from "../middleware/adminAuth.js";
 
 const router = express.Router();
 
@@ -18,13 +19,8 @@ router.get("/", async (req, res) => {
 });
 
 // Get all banned words with details (admin only)
-router.get("/admin", async (req, res) => {
+router.get("/admin", requireAdminAuth, async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (!adminKey || adminKey !== process.env.ADMIN_KEY) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const bannedWords = await BannedWord.find().sort({ createdAt: -1 });
     res.json(bannedWords);
   } catch (error) {
@@ -34,13 +30,8 @@ router.get("/admin", async (req, res) => {
 });
 
 // Add new banned word (admin only)
-router.post("/", async (req, res) => {
+router.post("/", requireAdminAuth, async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (!adminKey || adminKey !== process.env.ADMIN_KEY) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const { word } = req.body;
     if (!word || !word.trim()) {
       return res.status(400).json({ message: "Word is required" });
@@ -68,13 +59,8 @@ router.post("/", async (req, res) => {
 });
 
 // Update banned word (admin only)
-router.put("/:id", async (req, res) => {
+router.put("/:id", requireAdminAuth, async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (!adminKey || adminKey !== process.env.ADMIN_KEY) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const { word, isActive } = req.body;
     const updates = {};
 
@@ -99,13 +85,8 @@ router.put("/:id", async (req, res) => {
 });
 
 // Delete banned word (admin only)
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireAdminAuth, async (req, res) => {
   try {
-    const adminKey = req.headers["admin-key"];
-    if (!adminKey || adminKey !== process.env.ADMIN_KEY) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
     const bannedWord = await BannedWord.findByIdAndDelete(req.params.id);
     if (!bannedWord) {
       return res.status(404).json({ message: "Banned word not found" });
