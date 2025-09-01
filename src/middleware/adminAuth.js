@@ -5,6 +5,12 @@ export const requireAdminAuth = (req, res, next) => {
     return next();
   }
 
+  // Fallback: check admin key in header
+  const adminKeyHeader = req.headers["x-admin-key"];
+  if (adminKeyHeader && adminKeyHeader === process.env.ADMIN_KEY) {
+    return next();
+  }
+
   return res
     .status(401)
     .json({ message: "Unauthorized - Admin access required" });
@@ -12,5 +18,16 @@ export const requireAdminAuth = (req, res, next) => {
 
 // Helper function to check admin authentication
 export const checkAdminAuth = (req) => {
-  return req.session && req.session.isAdmin === true;
+  // Check session first
+  if (req.session && req.session.isAdmin === true) {
+    return true;
+  }
+
+  // Fallback: check admin key in header
+  const adminKeyHeader = req.headers["x-admin-key"];
+  if (adminKeyHeader && adminKeyHeader === process.env.ADMIN_KEY) {
+    return true;
+  }
+
+  return false;
 };

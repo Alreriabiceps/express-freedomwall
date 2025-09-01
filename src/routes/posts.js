@@ -302,6 +302,7 @@ router.post("/admin/login", async (req, res) => {
       message: "Admin login successful",
       sessionID: req.sessionID,
       isAdmin: req.session.isAdmin,
+      adminKey: adminKey, // Temporary: send back admin key for localStorage fallback
     });
   } catch (error) {
     console.error("Admin login error:", error);
@@ -334,13 +335,23 @@ router.get("/admin/auth-check", async (req, res) => {
       isAdmin: req.session?.isAdmin,
       cookie: req.headers.cookie,
       userAgent: req.headers["user-agent"],
+      adminKeyHeader: req.headers["x-admin-key"], // Check for admin key header
     });
 
+    // Check session first
     if (checkAdminAuth(req)) {
       res.json({ authenticated: true });
-    } else {
-      res.status(401).json({ authenticated: false });
+      return;
     }
+
+    // Fallback: check admin key in header
+    const adminKeyHeader = req.headers["x-admin-key"];
+    if (adminKeyHeader && adminKeyHeader === process.env.ADMIN_KEY) {
+      res.json({ authenticated: true });
+      return;
+    }
+
+    res.status(401).json({ authenticated: false });
   } catch (error) {
     console.error("Auth check error:", error);
     res.status(500).json({ message: "Auth check error", error: error.message });

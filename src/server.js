@@ -76,13 +76,14 @@ app.use(cookieParser());
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "fallback-secret-for-development",
-    resave: false,
-    saveUninitialized: false,
+    resave: true, // Force resave to ensure cookies are set
+    saveUninitialized: true, // Allow uninitialized sessions
     cookie: {
-      secure: process.env.NODE_ENV === "PRODUCTION", // Match your Render environment variable
-      httpOnly: true,
+      secure: false, // Force HTTP cookies for now
+      httpOnly: false, // Allow JavaScript access for debugging
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: "lax", // Allow cross-site requests for authentication
+      sameSite: "none", // Allow all cross-site requests
+      path: "/", // Ensure cookie is available everywhere
     },
   })
 );
