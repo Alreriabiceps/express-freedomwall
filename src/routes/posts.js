@@ -290,8 +290,21 @@ router.post("/admin/login", async (req, res) => {
     req.session.isAdmin = true;
     req.session.adminLoginTime = new Date();
 
-    res.json({ message: "Admin login successful" });
+    // Debug logging
+    console.log("Admin login successful:", {
+      sessionID: req.sessionID,
+      isAdmin: req.session.isAdmin,
+      adminLoginTime: req.session.adminLoginTime,
+      cookie: req.headers.cookie,
+    });
+
+    res.json({
+      message: "Admin login successful",
+      sessionID: req.sessionID,
+      isAdmin: req.session.isAdmin,
+    });
   } catch (error) {
+    console.error("Admin login error:", error);
     res.status(500).json({ message: "Login error", error: error.message });
   }
 });
@@ -303,7 +316,8 @@ router.post("/admin/logout", async (req, res) => {
       if (err) {
         return res.status(500).json({ message: "Logout error" });
       }
-      res.clearCookie("connect.sid"); // Clear session cookie
+      // Clear the session cookie (let express-session handle the cookie name)
+      res.clearCookie("connect.sid");
       res.json({ message: "Admin logout successful" });
     });
   } catch (error) {
@@ -314,12 +328,21 @@ router.post("/admin/logout", async (req, res) => {
 // GET /api/v1/posts/admin/auth-check - Check if admin is authenticated
 router.get("/admin/auth-check", async (req, res) => {
   try {
+    // Debug logging
+    console.log("Auth check request:", {
+      sessionID: req.sessionID,
+      isAdmin: req.session?.isAdmin,
+      cookie: req.headers.cookie,
+      userAgent: req.headers["user-agent"],
+    });
+
     if (checkAdminAuth(req)) {
       res.json({ authenticated: true });
     } else {
       res.status(401).json({ authenticated: false });
     }
   } catch (error) {
+    console.error("Auth check error:", error);
     res.status(500).json({ message: "Auth check error", error: error.message });
   }
 });

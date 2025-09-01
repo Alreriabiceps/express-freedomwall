@@ -79,7 +79,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production", // HTTPS only in production
+      secure: process.env.NODE_ENV === "PRODUCTION", // Match your Render environment variable
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
       sameSite: "lax", // Allow cross-site requests for authentication
@@ -242,6 +242,21 @@ app.use("/api/v1/chat", chatRouter);
 // Health check
 app.get("/health", (req, res) => {
   res.json({ status: "OK", message: "Freedom Wall API is running" });
+});
+
+// Session test route for debugging
+app.get("/session-test", (req, res) => {
+  if (!req.session.visits) {
+    req.session.visits = 0;
+  }
+  req.session.visits++;
+  res.json({
+    message: "Session test",
+    visits: req.session.visits,
+    sessionId: req.sessionID,
+    cookie: req.headers.cookie,
+    userAgent: req.headers["user-agent"],
+  });
 });
 
 // Error handling middleware
